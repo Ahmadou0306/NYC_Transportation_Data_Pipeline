@@ -47,6 +47,7 @@ with DAG(
     pull_task = PythonOperator(
         task_id="pull_task",
         python_callable=pull_x_com,
+        trigger_rule="none_failed_min_one_success"
     )
     
     fin = EmptyOperator(task_id="fin")

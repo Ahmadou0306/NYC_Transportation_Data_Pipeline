@@ -95,18 +95,21 @@ Pipeline ELT end-to-end pour l'analyse des données de transport de New York Cit
 ## 📊 Sources de données
 
 ### Données horaires (24x/jour)
-- **NYC Real-Time Traffic Speed** : Vitesse du trafic en temps réel par segment de rue
+- **NYC Real-Time Traffic Speed** : Vitesse du trafic en temps réel par segment de rue -> https://data.cityofnewyork.us/resource/i4gi-tjb9.json?$limit=10000&$where=data_as_of between '2024-01-15T00:00:00' and '2024-01-15T23:59:59'
 
 ### Données quotidiennes (1x/jour)
-- **NYC Traffic Volume Counts** : Comptages de véhicules par intersection
-- **NYC 311 Service Requests** : Plaintes et demandes de service non-urgentes
-- **NOAA Weather Data** : Données météo (précipitations, température, neige)
+- **NYC Traffic Volume Counts** : Comptages de véhicules par intersection -> https://data.cityofnewyork.us/resource/btm5-ppia.csv?$limit=50000&$where=yr=2024 AND m=1 AND d=15
+ 
+- **NYC 311 Service Requests** : Plaintes et demandes de service non-urgentes -> https://data.cityofnewyork.us/resource/erm2-nwe9.json?$limit=50000&$where=created_date between '2024-01-15T00:00:00' and '2024-01-15T23:59:59'
+
+- **NOAA Weather Data** : Données météo (précipitations, température, neige) -> https://www.ncei.noaa.gov/access/services/data/v1?dataset=daily-summaries&dataTypes=PRCP,TMAX,TMIN,SNOW&stations=USW00094728&startDate=2024-01-15&endDate=2024-01-15&format=json
+
 
 ### Données mensuelles (1x/mois)
-- **Yellow Taxi Trips** : Courses de taxis jaunes
-- **Green Taxi Trips** : Courses de taxis verts (banlieue)
-- **For-Hire Vehicle Trips** : Courses de véhicules de location
-- **High Volume FHV Trips** : Courses haute fréquence (Uber, Lyft)
+- **Yellow Taxi Trips** : Courses de taxis jaunes -> https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet
+- **Green Taxi Trips** : Courses de taxis verts (banlieue) -> https://d37ci6vzurychx.cloudfront.net/trip-data/green_tripdata_2024-01.parquet
+- **For-Hire Vehicle Trips** : Courses de véhicules de location -> https://d37ci6vzurychx.cloudfront.net/trip-data/fhv_tripdata_2024-01.parquet
+- **High Volume FHV Trips** : Courses haute fréquence (Uber, Lyft) -> https://d37ci6vzurychx.cloudfront.net/trip-data/fhvhv_tripdata_2024-01.parquet
 
 ## 📈 Métriques du projet
 
