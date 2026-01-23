@@ -1,0 +1,8 @@
+nyc_transformation_dbt:
+  target: dev
+
+  outputs:
+    dev: 
+      type: duckdb
+      path: outputs/transformed_data.db
+      schema: main
