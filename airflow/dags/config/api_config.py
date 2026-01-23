@@ -13,7 +13,7 @@ PROJECT_NAME = "nyc-transport-pipeline"
 API_CONFIG = {
     'traffic_speed': {
         'base_url': 'https://data.cityofnewyork.us/resource/i4gi-tjb9.json',
-        'limit': 10000,
+        'limit': 50000,
         'order_by': 'data_as_of ASC',
         'date_field': 'data_as_of',
     },
@@ -26,8 +26,7 @@ API_CONFIG = {
     'traffic_volume': {
         'base_url': 'https://data.cityofnewyork.us/resource/btm5-ppia.csv',
         'limit': 50000,
-        'order_by': None,
-        'date_field': None,  # Utilise yr, m, d séparément
+        'date_field': 'yr',  # Utilise yr, m, d séparément
     },
     'weather': {
         'base_url': 'https://www.ncei.noaa.gov/access/services/data/v1',

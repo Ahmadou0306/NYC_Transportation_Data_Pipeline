@@ -53,13 +53,3 @@ def get_collected_tags(collected_name:str, frequency:str="days"):
                 )    
     return all_collected_tags[frequency]+[collected_name]
 
-def push_x_com(ti, message, value):
-    """Pousse un message dans XCom"""
-    ti.xcom_push(key=message, value=value)
-    print("Message envoyé dans XCom")
-
-
-def pull_x_com(ti, task_origins, key):
-    """Récupère le message depuis XCom"""
-    message = ti.xcom_pull(task_ids=task_origins, key=key)
-    print(f"Message reçu : {message}")

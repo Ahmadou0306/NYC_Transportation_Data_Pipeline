@@ -1,21 +1,20 @@
-from datetime import timedelta, datetime
-from airflow import DAG
-from utils.utilitaire import get_collected_tags, pull_x_com, push_x_com
 from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
-import time
+from utils.utilitaire import get_collected_tags
+from datetime import timedelta, datetime
+from google.cloud import storage
+from airflow import DAG
 import requests
 import json
-import os
-
-from google.cloud import storage
+import time
 
 
 import logging
 logger = logging.getLogger(__name__)
 
 COLLECTED_NAME = "NYC_Real_Time_Traffic_Speed"
+API_LABEL = "traffic_speed"
 
 def extract_data_with_pagination(
     base_url: str,
@@ -106,7 +105,7 @@ def extract_traffic_speed(ti, **kwargs):
     
     execution_date = kwargs.get('logical_date') or kwargs.get('execution_date')
 
-    config = API_CONFIG["traffic_speed"]
+    config = API_CONFIG[API_LABEL]
     
     start_datetime, end_datetime = build_datetime_range(execution_date)
     
@@ -221,6 +220,7 @@ with DAG (
     description=(
         "Ce Dags est présent pour collecter les données horaires provenant de la plateforme https://data.cityofnewyork.us."
         "Il s'agit Vitesse du trafic en temps réel par segment de rue. Les données seront récupérés toutes les heures."
+        f"Les données sont presents ici: {API_CONFIG[API_LABEL]}"
     ),
     start_date=datetime(2024, 1, 1),
     end_date=datetime(2024, 1, 31, 23, 59),
