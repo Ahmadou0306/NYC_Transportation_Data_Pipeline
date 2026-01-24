@@ -1,7 +1,6 @@
 from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
-from utils.utilitaire import get_collected_tags
 from datetime import timedelta, datetime
 from google.cloud import storage
 from airflow import DAG
@@ -13,55 +12,77 @@ import time
 import logging
 logger = logging.getLogger(__name__)
 
+from utils.utilitaire import get_collected_tags, fetch_data_from_url, build_gcs_path
+
+
 COLLECTED_NAME = "NYC_Real_Time_Traffic_Speed"
 API_LABEL = "traffic_speed"
 
-def extract_data_with_pagination(
-    base_url: str,
-    start_datetime: str,
-    end_datetime: str,
-    date_field: str = 'data_as_of',
-    limit: int = 10000,
-    max_retries: int = 3
-) -> list:
+
+
+def build_datetime_range(execution_date: datetime) -> tuple:
+    start_time = execution_date.replace(minute=0, second=0, microsecond=0)
+    end_time = start_time + timedelta(hours=1) - timedelta(seconds=1)
+    start_str = start_time.strftime('%Y-%m-%dT%H:%M:%S')
+    end_str = end_time.strftime('%Y-%m-%dT%H:%M:%S')
+    logger.info(f"Plage temporelle: {start_str} -> {end_str}")
+    return start_str, end_str
+
+
+def extract_traffic_speed(ti, **kwargs):
+    logger.info("DÉBUT EXTRACTION TRAFFIC SPEED")
+    
+    execution_date = kwargs.get('logical_date') or kwargs.get('execution_date')
+
+    config = API_CONFIG[API_LABEL]
+    base_url = config['base_url']
+    limit = config['limit']
+    date_field = config['date_field']
+    
+    start_datetime, end_datetime = build_datetime_range(execution_date)
+    
+    # Informations de debug
+    logger.info(f"Configuration:")
+    logger.info(f"Source: {COLLECTED_NAME}")
+    logger.info(f"Base URL: {config['base_url']}")
+    logger.info(f"Date field: {config['date_field']}")
+    logger.info(f"Limit: {config['limit']}")
+    logger.info(f"Execution date: {execution_date}")
+
+
     all_data = []
-    offset = 0
-    page = 1
-
-    logger.info(f"Début extraction: {start_datetime} → {end_datetime}")
-
+    max_retries=3 #Nombre de tentative
+    page=1 # Init page
+    offset=0
     while True:
-        url = (
-            f"{base_url}"
-            f"?$limit={limit}"
-            f"&$offset={offset}"
-            f"&$where={date_field} between '{start_datetime}' and '{end_datetime}'"
-            f"&$order={date_field} ASC"
-        )
-        logger.info(f"Page {page} - Offset {offset}")
+        nb_lignes = 0
         for attempt in range(max_retries):
+            url = (
+                f"{base_url}"
+                f"?$limit={limit}"
+                f"&$offset={offset}"
+                f"&$where={date_field} between '{start_datetime}' and '{end_datetime}'"
+                f"&$order={date_field} ASC"
+            )
+            logger.info(f"Page {page} - Offset {offset}")
             try:
-                response = requests.get(url, timeout=30)
-                response.raise_for_status()
+                results = fetch_data_from_url(url)
+                logger.info(f"format de la réponse {results['format']}")
 
-                data = response.json()
-
+                if results['format'] != 'json':
+                    raise Exception(f"Format incorrecte, nous attendons un fichier json.") 
+                
+                data = results['data'] # Les données sont déja convertis en json
                 if not data or len(data) == 0:
-                    logger.info(f"Pagination terminée. Total: {len(all_data)} lignes")
-                    return all_data
+                    raise Exception(f"Aucune donnée") 
                 
                 all_data.extend(data)
+                nb_lignes = len(data)
                 logger.info(f"{len(data)} lignes (Cumulé: {len(all_data)})")
 
-                if len(data) < limit:
-                    logger.info(f"Dernière page. Total: {len(all_data)} lignes")
-                    return all_data
-                
                 offset += limit
-                page += 1
-                time.sleep(0.5)
-                break #Sort de la boucle si tout est ok
-
+                page +=1
+                break
             except requests.exceptions.Timeout:
                 logger.warning(f"Timeout (tentative {attempt + 1}/{max_retries})")
                 if attempt == max_retries - 1:
@@ -73,86 +94,35 @@ def extract_data_with_pagination(
                 if attempt == max_retries - 1:
                     raise Exception(f"Erreur API après {max_retries} tentatives: {e}")
                 time.sleep(2 ** attempt)
-        return all_data
 
-def build_datetime_range(execution_date: datetime) -> tuple:
-    start_time = execution_date.replace(minute=0, second=0, microsecond=0)
-    end_time = start_time + timedelta(hours=1) - timedelta(seconds=1)
-    start_str = start_time.strftime('%Y-%m-%dT%H:%M:%S')
-    end_str = end_time.strftime('%Y-%m-%dT%H:%M:%S')
-    logger.info(f"Plage temporelle: {start_str} -> {end_str}")
-    return start_str, end_str
+        if nb_lignes < limit:
+            logger.info(f"Fin de pagination: dernière page avec {nb_lignes} lignes")
+            break  
 
-def build_gcs_path(execution_date: datetime, source_name: str) -> str:
-    year = execution_date.year
-    month = f"{execution_date.month:02d}"
-    day = f"{execution_date.day:02d}"
-    hour = f"{execution_date.hour:02d}"
-    minute = f"{execution_date.minute:02d}"
+    logger.info(f"longueur des données: {len(all_data)}")
 
-    gcs_path = (
-        f"raw/{source_name}/"
-        f"year={year}/month={month}/day={day}/"
-        f"{source_name}_{year}{month}{day}_{hour}{minute}.json"
-    )
-    
-    logger.info(f"Chemin GCS: {gcs_path}")
-    return gcs_path
-
-
-def extract_traffic_speed(ti, **kwargs):
-    logger.info("DÉBUT EXTRACTION TRAFFIC SPEED")
-    
-    execution_date = kwargs.get('logical_date') or kwargs.get('execution_date')
-
-    config = API_CONFIG[API_LABEL]
-    
-    start_datetime, end_datetime = build_datetime_range(execution_date)
-    
-    # Informations de debug
-    logger.info(f"Configuration:")
-    logger.info(f"Source: {COLLECTED_NAME}")
-    logger.info(f"Base URL: {config['base_url']}")
-    logger.info(f"Date field: {config['date_field']}")
-    logger.info(f"Limit: {config['limit']}")
-    logger.info(f"Execution date: {execution_date}")
-    
-    # Extraction avec pagination
-    try:
-        all_data = extract_data_with_pagination(
-            base_url=config['base_url'],
-            start_datetime=start_datetime,
-            end_datetime=end_datetime,
-            date_field=config['date_field'],
-            limit=config['limit']
+    # Validation
+    if not all_data:
+        raise ValueError(
+            f"Aucune donnée extraite à la date du {start_datetime}"
         )
         
-        # Validation
-        if not all_data:
-            raise ValueError(
-                f"Aucune donnée extraite entre les dates suivantes {start_datetime} -> {end_datetime}"
-            )
-        
-        nb_records = len(all_data)
-        logger.info(f"Extraction réussie: {nb_records} enregistrements")
-        
-        # Stocker dans XCom pour la tâche suivante
-        ti.xcom_push(key='traffic_data', value=all_data)
-        ti.xcom_push(key='nb_records', value=nb_records)
-        ti.xcom_push(key='start_datetime', value=start_datetime)
-        ti.xcom_push(key='end_datetime', value=end_datetime)
-                
-        return nb_records
-        
-    except Exception as e:
-        logger.error(f"Erreur lors de l'extraction: {e}")
-        raise
+    nb_records = len(all_data)
+    logger.info(f"Extraction réussie: {nb_records} enregistrements")
+    
+    # Stocker dans XCom pour la tâche suivante
+    ti.xcom_push(key='traffic_data', value=all_data)
+    ti.xcom_push(key='nb_records', value=nb_records)
+    ti.xcom_push(key='start_datetime', value=start_datetime)
+    ti.xcom_push(key='end_datetime', value=end_datetime)
+            
+    return nb_records
+
 
 def upload_to_gcs(ti, **kwargs):
     logger.info("DÉBUT UPLOAD VERS GCS")
     
     logger.info(kwargs)
-    execution_date = kwargs.get('logical_date') or kwargs.get('execution_date')
     # Récupérer les données depuis XCom
     data = ti.xcom_pull(task_ids='extract_data', key='traffic_data')
     nb_records = ti.xcom_pull(task_ids='extract_data', key='nb_records')
@@ -164,7 +134,13 @@ def upload_to_gcs(ti, **kwargs):
     logger.info(f"Période: {start_datetime} -> {end_datetime}")
     
     # Construire le chemin GCS
-    gcs_path = build_gcs_path(execution_date, COLLECTED_NAME)
+    gcs_path = build_gcs_path(
+        date=start_datetime, # Seul les YYYYMMDDHH nous interesse. On aurait pu prendre aussi end_datetime
+        source_name=COLLECTED_NAME,
+        frequency="hourly",
+        extension="json"
+    )
+
     
     try:
         # Initialiser client GCS
