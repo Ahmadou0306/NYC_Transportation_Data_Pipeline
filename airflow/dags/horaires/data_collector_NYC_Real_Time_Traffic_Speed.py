@@ -1,4 +1,3 @@
-from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from datetime import timedelta, datetime
@@ -12,6 +11,7 @@ import time
 import logging
 logger = logging.getLogger(__name__)
 
+from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME
 from utils.utilitaire import get_collected_tags, fetch_data_from_url, build_gcs_path
 
 
@@ -187,14 +187,14 @@ default_args = {
 #    'start_date': datetime(2020, 1, 1),
     'retries': 3,
     'retry_delay': timedelta(minutes=5),
-    'execution_timeout': timedelta(hours=2),
+    'execution_timeout': timedelta(minutes=30),
 }
 
 # On aurait pu utiliser ici
 # from config.api_config import DAG_DEFAULT_ARGS
 # default_args = DAG_DEFAULT_ARGS
 # default_args["retry_delay"] = timedelta(minutes=5)
-# default_args["execution_timeout"] = timedelta(hours=2)
+# default_args["execution_timeout"] = timedelta(minutes=30)
 
 with DAG (
     f"{PROJECT_NAME}_{COLLECTED_NAME}",

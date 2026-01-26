@@ -1,3 +1,4 @@
+from datetime import timedelta
 import os
 
 GCP_PROJECT_ID = os.getenv('GCP_PROJECT_ID')
@@ -58,5 +59,7 @@ DAG_DEFAULT_ARGS = {
     'email': ['ahmadou.ndiaye030602@gmail.com'],
     'email_on_failure': False,
     'email_on_retry': False,
-    'retries': 3
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+    'execution_timeout': timedelta(hours=2)
 }
