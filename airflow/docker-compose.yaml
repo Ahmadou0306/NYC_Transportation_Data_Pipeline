@@ -181,6 +181,7 @@ services:
       # Required to handle warm shutdown of the celery workers properly
       # See https://airflow.apache.org/docs/docker-stack/entrypoint.html#signal-propagation
       DUMB_INIT_SETSID: "0"
+      AIRFLOW__CELERY__WORKER_CONCURRENCY: 8 # 8 tâches simultanées
     restart: always
     depends_on:
       <<: *airflow-common-depends-on

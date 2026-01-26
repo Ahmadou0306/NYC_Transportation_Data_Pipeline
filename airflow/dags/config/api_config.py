@@ -37,5 +37,26 @@ API_CONFIG = {
             'format': 'json',
             'units': 'metric',
         },
+    }, 
+        'yellow_axi_vehicule_trips':{
+            'base_url':"https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata",
+            'format':"parquet"
     },
+        'for_hire_vehicule_trips':{
+            'base_url':" https://d37ci6vzurychx.cloudfront.net/trip-data/fhv_tripdata",
+            'format':"parquet"
+    },
+        'high_volume_vehicule_trips':{
+            'base_url':"https://d37ci6vzurychx.cloudfront.net/trip-data/fhvhv_tripdata",
+            'format':"parquet"
+    }
+}
+
+DAG_DEFAULT_ARGS = {
+    'owner': 'ahmad',
+    'depends_on_past': False,
+    'email': ['ahmadou.ndiaye030602@gmail.com'],
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 3
 }

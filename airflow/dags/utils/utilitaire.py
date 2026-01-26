@@ -94,6 +94,10 @@ def fetch_data_from_url(url:str,timeout: int = 30)-> Dict[str, Any]:
         elif 'text/csv' in content_type or url.endswith('.csv'):
             result['data'] = response.text
             result['format'] = 'csv'
+
+        elif 'application/octet-stream' in content_type or url.endswith('.parquet'):
+            result['data'] = response.content  # Données binaires brutes
+            result['format'] = 'parquet'
         
         elif 'application/xml' in content_type or 'text/xml' in content_type or url.endswith('.xml'):
             result['data'] = response.text
@@ -142,7 +146,7 @@ def build_gcs_path(date: datetime, source_name: str, frequency: str, extension: 
             f"{source_name}_{year}.{extension}"
         ),
         "monthly": (
-            f"raw/{source_name}/year={year}/month={month}",
+            f"raw/{source_name}/year={year}",
             f"{source_name}_{year}{month}.{extension}"
         ),
         "weekly": (
@@ -150,11 +154,11 @@ def build_gcs_path(date: datetime, source_name: str, frequency: str, extension: 
             f"{source_name}_{year}_W{date.isocalendar()[1]:02d}.{extension}"
         ),
         "daily": (
-            f"raw/{source_name}/year={year}/month={month}/days={day}",
+            f"raw/{source_name}/year={year}/month={month}",
             f"{source_name}_{year}{month}{day}.{extension}"
         ),
         "hourly": (
-            f"raw/{source_name}/year={year}/month={month}/days={day}/hour={date.hour:02d}",
+            f"raw/{source_name}/year={year}/month={month}/days={day}",
             f"{source_name}_{year}{month}{day}_{date.hour:02d}{date.minute:02d}.{extension}"
         )
     }

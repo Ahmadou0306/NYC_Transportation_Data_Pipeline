@@ -30,7 +30,7 @@ def build_datetime_range(execution_date: datetime) -> tuple:
 
 
 def extract_traffic_speed(ti, **kwargs):
-    logger.info("DÉBUT EXTRACTION TRAFFIC SPEED")
+    logger.info("DEBUT EXTRACTION TRAFFIC SPEED")
     
     execution_date = kwargs.get('logical_date') or kwargs.get('execution_date')
 
@@ -44,9 +44,9 @@ def extract_traffic_speed(ti, **kwargs):
     # Informations de debug
     logger.info(f"Configuration:")
     logger.info(f"Source: {COLLECTED_NAME}")
-    logger.info(f"Base URL: {config['base_url']}")
-    logger.info(f"Date field: {config['date_field']}")
-    logger.info(f"Limit: {config['limit']}")
+    logger.info(f"Base URL: {base_url}")
+    logger.info(f"Date field: {date_field}")
+    logger.info(f"Limit: {limit}")
     logger.info(f"Execution date: {execution_date}")
 
 
@@ -111,7 +111,7 @@ def extract_traffic_speed(ti, **kwargs):
     logger.info(f"Extraction réussie: {nb_records} enregistrements")
     
     # Stocker dans XCom pour la tâche suivante
-    ti.xcom_push(key='traffic_data', value=all_data)
+    ti.xcom_push(key=API_LABEL, value=all_data)
     ti.xcom_push(key='nb_records', value=nb_records)
     ti.xcom_push(key='start_datetime', value=start_datetime)
     ti.xcom_push(key='end_datetime', value=end_datetime)
@@ -120,14 +120,14 @@ def extract_traffic_speed(ti, **kwargs):
 
 
 def upload_to_gcs(ti, **kwargs):
-    logger.info("DÉBUT UPLOAD VERS GCS")
+    logger.info("DEBUT UPLOAD VERS GCS")
     
-    logger.info(kwargs)
+    logger.debug(kwargs)
     # Récupérer les données depuis XCom
-    data = ti.xcom_pull(task_ids='extract_data', key='traffic_data')
+    data = ti.xcom_pull(task_ids='extract_data', key=API_LABEL)
     nb_records = ti.xcom_pull(task_ids='extract_data', key='nb_records')
-    start_datetime = ti.xcom_pull(task_ids='extract_data', key='start_datetime')
-    end_datetime = ti.xcom_pull(task_ids='extract_data', key='end_datetime')
+    start_datetime =  datetime.fromisoformat(ti.xcom_pull(task_ids='extract_data', key='start_datetime'))
+    end_datetime = datetime.fromisoformat(ti.xcom_pull(task_ids='extract_data', key='end_datetime'))
     
     logger.info(f"Données récupérées depuis XCom:")
     logger.info(f"Enregistrements: {nb_records}")
@@ -135,7 +135,7 @@ def upload_to_gcs(ti, **kwargs):
     
     # Construire le chemin GCS
     gcs_path = build_gcs_path(
-        date=start_datetime, # Seul les YYYYMMDDHH nous interesse. On aurait pu prendre aussi end_datetime
+        date=(start_datetime), # Seul les YYYYMMDDHH nous interesse. On aurait pu prendre aussi end_datetime
         source_name=COLLECTED_NAME,
         frequency="hourly",
         extension="json"
@@ -181,14 +181,20 @@ def upload_to_gcs(ti, **kwargs):
 default_args = {
     'owner': 'ahmad',
     'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
     'email': ['ahmadou.ndiaye030602@gmail.com'],
-    'email_on_failure': True,
-    'email_on_retry': True,
+    'email_on_failure': False,
+    'email_on_retry': False,
+#    'start_date': datetime(2020, 1, 1),
     'retries': 3,
     'retry_delay': timedelta(minutes=5),
-    'execution_timeout': timedelta(minutes=30),
+    'execution_timeout': timedelta(hours=2),
 }
+
+# On aurait pu utiliser ici
+# from config.api_config import DAG_DEFAULT_ARGS
+# default_args = DAG_DEFAULT_ARGS
+# default_args["retry_delay"] = timedelta(minutes=5)
+# default_args["execution_timeout"] = timedelta(hours=2)
 
 with DAG (
     f"{PROJECT_NAME}_{COLLECTED_NAME}",
@@ -196,10 +202,10 @@ with DAG (
     description=(
         "Ce Dags est présent pour collecter les données horaires provenant de la plateforme https://data.cityofnewyork.us."
         "Il s'agit Vitesse du trafic en temps réel par segment de rue. Les données seront récupérés toutes les heures."
-        f"Les données sont presents ici: {API_CONFIG[API_LABEL]}"
+        f"Les données sont presents ici: {API_CONFIG[API_LABEL]['base_url']}"
     ),
-    start_date=datetime(2024, 1, 1),
-    end_date=datetime(2024, 1, 31, 23, 59),
+    start_date=datetime(2020, 1, 1),
+    end_date=datetime(2025, 1, 31),
     schedule='5 * * * *', # Toutes les heures + 5 minutes
     catchup=True,
     max_active_runs=1, # Nombre de worker
