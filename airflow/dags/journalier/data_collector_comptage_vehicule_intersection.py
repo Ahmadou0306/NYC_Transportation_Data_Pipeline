@@ -2,7 +2,7 @@ from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from datetime import timedelta, datetime
 from google.cloud import storage
-from airflow import DAG
+from airflow import DAG, Asset
 import requests
 import csv
 import time
@@ -12,11 +12,13 @@ from io import StringIO
 import logging
 logger = logging.getLogger(__name__)
 
-from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME
+from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME,ASSET_PATH
 from utils.utilitaire import get_collected_tags, fetch_data_from_url, build_gcs_path
 
-COLLECTED_NAME = "Comptages_véhicules_intersection"
+COLLECTED_NAME = "comptages_vehicules_intersection"
 API_LABEL = "traffic_volume"
+
+gcs_traffic_volume = Asset(ASSET_PATH["traffic_volume"])
 
 
 def build_datetime_range(execution_date: datetime) -> dict:
@@ -236,6 +238,7 @@ with DAG(
         task_id='upload_to_gcs',
         python_callable=upload_to_gcs,
         trigger_rule="all_success",
+        outlets=[gcs_traffic_volume],
     )
 
     fin = EmptyOperator(task_id="fin")

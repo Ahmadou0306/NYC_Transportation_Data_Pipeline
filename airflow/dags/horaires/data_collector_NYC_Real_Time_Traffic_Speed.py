@@ -2,7 +2,7 @@ from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from datetime import timedelta, datetime
 from google.cloud import storage
-from airflow import DAG
+from airflow import DAG, Asset
 import requests
 import json
 import time
@@ -11,12 +11,14 @@ import time
 import logging
 logger = logging.getLogger(__name__)
 
-from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME
+from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME, ASSET_PATH
 from utils.utilitaire import get_collected_tags, fetch_data_from_url, build_gcs_path
 
 
 COLLECTED_NAME = "NYC_Real_Time_Traffic_Speed"
 API_LABEL = "traffic_speed"
+
+gcs_traffic_speed = Asset(ASSET_PATH["traffic_speed"])
 
 
 
@@ -190,12 +192,13 @@ default_args = {
     'execution_timeout': timedelta(minutes=30),
 }
 
+
 # On aurait pu utiliser ici
 # from config.api_config import DAG_DEFAULT_ARGS
 # default_args = DAG_DEFAULT_ARGS
 # default_args["retry_delay"] = timedelta(minutes=5)
 # default_args["execution_timeout"] = timedelta(minutes=30)
-
+# Data Collector DAG
 with DAG (
     f"{PROJECT_NAME}_{COLLECTED_NAME}",
     default_args=default_args,
@@ -222,8 +225,11 @@ with DAG (
         task_id='upload_to_gcs',
         python_callable=upload_to_gcs,
         trigger_rule="all_success",
+        outlets=[gcs_traffic_speed],
     )
 
     fin = EmptyOperator(task_id="fin")
 
     debut >> extract_task >> upload_task >> fin
+
+

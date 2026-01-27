@@ -56,7 +56,11 @@ def get_collected_tags(collected_name:str, frequency:str="days"):
                     f"Fréquence '{frequency}' invalide. "
                     f"Valeurs acceptées: {list(all_collected_tags.keys())}"
                 )    
-    return all_collected_tags[frequency]+[collected_name]
+    base = all_collected_tags[frequency]
+    if isinstance(collected_name, list):
+        return base + collected_name
+    else:
+        return base + [collected_name]
 
 
 

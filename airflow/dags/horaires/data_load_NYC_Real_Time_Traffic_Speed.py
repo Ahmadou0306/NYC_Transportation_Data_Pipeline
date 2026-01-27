@@ -1,35 +1,43 @@
-from airflow import DAG
+from airflow import DAG, Asset
 from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator
-from airflow.providers.standard.operators.empty import EmptyOperator
 from datetime import datetime, timedelta
 
 import logging
 logger = logging.getLogger(__name__)
 
-from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME, DAG_DEFAULT_ARGS, GCP_PROJECT_ID
-
+from config.api_config import ASSET_PATH, PROJECT_NAME, GCS_BUCKET_NAME, DAG_DEFAULT_ARGS, GCP_PROJECT_ID
+from utils.utilitaire import get_collected_tags
 # ========== CONFIGURATION ==========
-DATASET_STAGING = "staging"
+COLLECTED_NAME = "NYC_Real_Time_Traffic_Speed"
+
+gcs_traffic_speed = Asset(ASSET_PATH["traffic_speed"])
 
 # ========== DAG QUOTIDIEN ==========
+base_tags = ['load', 'bigquery', 'hourly']
+collected_tags = get_collected_tags(COLLECTED_NAME, "hour")
+all_tags = base_tags + collected_tags
 with DAG(
     f'{PROJECT_NAME}_load_to_bq_hourly',
     default_args=DAG_DEFAULT_ARGS,
     description='Chargement des données horaires dans Big query',
-    schedule='0 3 * * *',  # 3h du matin (après extractions)
-    catchup=True,
+    schedule=[gcs_traffic_speed],  # Consomme l'asset
+    catchup=False,
     max_active_runs=1,
-    tags=['load', 'bigquery', 'daily'],
+    tags=all_tags,
 ) as dag:
     
-    start = EmptyOperator(task_id='start')
-    
-    # ===== 311 REQUESTS =====
-    load_traffic_spped = GCSToBigQueryOperator(
-        task_id='load_311_requests',
+    load_traffic_speed = GCSToBigQueryOperator(
+        task_id='load_to_bigquery_hourly',
         bucket=GCS_BUCKET_NAME,
-        source_objects=['raw/NYC_Real_Time_Traffic_Speed/year={{ execution_date.year }}/month={{ execution_date.month }}/day={{ execution_date.day }}/*.json'],
-        destination_project_dataset_table=f'{GCP_PROJECT_ID}.{DATASET_STAGING}.raw_311_requests',
+        source_objects=[
+            f"raw/{COLLECTED_NAME}/"
+            "year={{ execution_date.year }}/"
+            "month={{ execution_date.month }}/"
+            "day={{ execution_date.day }}/"
+            f"{COLLECTED_NAME}_"
+            "{{ execution_date.strftime('%Y%m%d_%H') }}00.json"
+        ],
+        destination_project_dataset_table=f'{GCP_PROJECT_ID}.staging.raw_traffic_speed',
         source_format='NEWLINE_DELIMITED_JSON',
         write_disposition='WRITE_APPEND',
         create_disposition='CREATE_IF_NEEDED',
@@ -37,7 +45,5 @@ with DAG(
         gcp_conn_id='google_cloud_default',
     )
     
-    end = EmptyOperator(task_id='end')
     
-    # Exécution en parallèle
-    start >> [load_traffic_spped] >> end
+    load_traffic_speed

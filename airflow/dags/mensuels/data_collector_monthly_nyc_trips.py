@@ -2,7 +2,7 @@ from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from datetime import timedelta, datetime
 from google.cloud import storage
-from airflow import DAG
+from airflow import DAG, Asset
 import requests
 import base64
 import time
@@ -11,13 +11,15 @@ from io import StringIO
 import logging
 logger = logging.getLogger(__name__)
 
-from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME, DAG_DEFAULT_ARGS
+from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME, DAG_DEFAULT_ARGS, ASSET_PATH
 from utils.utilitaire import get_collected_tags, fetch_data_from_url, build_gcs_path
 
 COLLECTED_NAME = "monthly_nyc_trips"
 API_LABEL = ["yellow_axi_vehicule_trips","for_hire_vehicule_trips","high_volume_vehicule_trips"]
 
-
+gcs_yellow_axi_vehicule_trips = Asset(ASSET_PATH["yellow_taxi"])
+gcs_for_hire_vehicule_trips = Asset(ASSET_PATH["for_hire_vehicule"])
+gcs_high_volume_vehicule_trips = Asset(ASSET_PATH["hvfhv"])
 
 
 
@@ -209,6 +211,7 @@ with DAG(
             'ti_extract':'extract_data_yellow_taxi'
         },
         trigger_rule="all_success",
+        outlets=[gcs_yellow_axi_vehicule_trips]
     )
     upload_task_for_hire_vehicule = PythonOperator(
         task_id='upload_to_gcs_for_hire_vehicule',
@@ -218,6 +221,7 @@ with DAG(
             'ti_extract':'extract_data_for_hire_vehicule'
         },
         trigger_rule="all_success",
+        outlets=[gcs_for_hire_vehicule_trips]
     )
 
 
@@ -228,7 +232,8 @@ with DAG(
             'api_label': API_LABEL[2],
             'ti_extract':'extract_data_high_volume_vehicule'
         },
-        trigger_rule="all_success"
+        trigger_rule="all_success",
+        outlets=[gcs_high_volume_vehicule_trips]
     )
 
     fin = EmptyOperator(task_id="fin", trigger_rule="all_success")
@@ -240,8 +245,6 @@ with DAG(
     extract_task_high_volume_vehicule >> upload_task_high_volume_vehicule
 
     [upload_task_yellow_taxi,upload_task_for_hire_vehicule,upload_task_high_volume_vehicule] >> fin
-
-
 
 
 

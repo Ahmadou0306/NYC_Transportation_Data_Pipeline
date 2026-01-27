@@ -7,6 +7,9 @@ GCP_CREDENTIALS_PATH = os.getenv(
     'GOOGLE_APPLICATION_CREDENTIALS',
     '/opt/airflow/config/gcp/airflow-gcp-key.json'
 )
+DATASETS_GBQ = {
+    "staging":"staging" # nom du dataset est staging 
+}
 
 
 PROJECT_NAME = "nyc-transport-pipeline"
@@ -39,17 +42,17 @@ API_CONFIG = {
             'units': 'metric',
         },
     }, 
-        'yellow_axi_vehicule_trips':{
-            'base_url':"https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata",
-            'format':"parquet"
+    'yellow_axi_vehicule_trips':{
+        'base_url':"https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata",
+        'format':"parquet"
     },
-        'for_hire_vehicule_trips':{
-            'base_url':" https://d37ci6vzurychx.cloudfront.net/trip-data/fhv_tripdata",
-            'format':"parquet"
+    'for_hire_vehicule_trips':{
+        'base_url':" https://d37ci6vzurychx.cloudfront.net/trip-data/fhv_tripdata",
+        'format':"parquet"
     },
-        'high_volume_vehicule_trips':{
-            'base_url':"https://d37ci6vzurychx.cloudfront.net/trip-data/fhvhv_tripdata",
-            'format':"parquet"
+    'high_volume_vehicule_trips':{
+        'base_url':"https://d37ci6vzurychx.cloudfront.net/trip-data/fhvhv_tripdata",
+        'format':"parquet"
     }
 }
 
@@ -62,4 +65,14 @@ DAG_DEFAULT_ARGS = {
     'retries': 3,
     'retry_delay': timedelta(minutes=5),
     'execution_timeout': timedelta(hours=2)
+}
+
+ASSET_PATH = {
+    'traffic_speed': f"gcs://{GCS_BUCKET_NAME}/raw/NYC_Real_Time_Traffic_Speed/",
+    '311_requests': f"gcs://{GCS_BUCKET_NAME}/raw/NYC_311_Service_Requests/",
+    'traffic_volume': f"gcs://{GCS_BUCKET_NAME}/raw/comptages_vehicules_intersection/",
+    'weather': f"gcs://{GCS_BUCKET_NAME}/raw/NOAA_Weather_Data/",
+    'yellow_taxi': f"gcs://{GCS_BUCKET_NAME}/raw/yellow_axi_vehicule_trips/",
+    'for_hire_vehicule': f"gcs://{GCS_BUCKET_NAME}/raw/for_hire_vehicule_trips/",
+    'hvfhv': f"gcs://{GCS_BUCKET_NAME}/raw/high_volume_vehicule_trips/",
 }

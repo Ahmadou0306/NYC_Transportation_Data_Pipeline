@@ -3,7 +3,7 @@ from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from datetime import timedelta, datetime
 from google.cloud import storage
-from airflow import DAG
+from airflow import DAG, Asset
 import requests
 import time
 
@@ -11,12 +11,13 @@ import time
 import logging
 logger = logging.getLogger(__name__)
 
-from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME
+from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME,ASSET_PATH
 from utils.utilitaire import get_collected_tags, fetch_data_from_url, build_gcs_path
 
 COLLECTED_NAME = "NOAA_Weather_Data"
 API_LABEL = "weather"
 
+gcs_weather = Asset(ASSET_PATH["weather"])
 
 def build_datetime_range(execution_date: datetime) ->tuple:
     start_date = execution_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -213,6 +214,7 @@ with DAG(
         task_id='upload_to_gcs',
         python_callable=upload_to_gcs,
         trigger_rule="all_success",
+        outlets=[gcs_weather],
     )
 
     fin = EmptyOperator(task_id="fin")
