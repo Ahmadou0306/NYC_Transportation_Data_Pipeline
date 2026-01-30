@@ -5,14 +5,18 @@ from datetime import timedelta, datetime
 from google.cloud import storage
 from airflow import DAG, Asset
 import requests
+import csv
 import time
+from io import StringIO
+from google.cloud import bigquery
 
 
 import logging
 logger = logging.getLogger(__name__)
 
-from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME,ASSET_PATH
-from utils.utilitaire import get_collected_tags, fetch_data_from_url, build_gcs_path
+from config.api_config import ASSET_PATH, PROJECT_NAME, GCS_BUCKET_NAME, API_CONFIG, GCP_PROJECT_ID,CONNECTION_BQ_AIRFLOW
+from utils.utilitaire import get_collected_tags, build_gcs_path, fetch_data_from_url, convert_to_ndjson
+
 
 COLLECTED_NAME = "NOAA_Weather_Data"
 API_LABEL = "weather"
@@ -137,7 +141,7 @@ def upload_to_gcs(ti, **kwargs):
     )
     
     try:
-                # Initialiser client GCS
+        # Initialiser client GCS
         client = storage.Client()
         bucket = client.bucket(GCS_BUCKET_NAME)
         blob = bucket.blob(gcs_path)
@@ -159,11 +163,53 @@ def upload_to_gcs(ti, **kwargs):
         logger.info(f"{nb_records} enregistrements")
         logger.info(f"{file_size_mb:.2f} MB")
 
-        # Retourner le chemin pour traçabilité
         return f"gs://{GCS_BUCKET_NAME}/{gcs_path}"
+
         
     except Exception as e:
         logger.error(f"Erreur lors de l'upload: {e}")
+        raise
+
+def upload_to_bq(ti, **kwargs):
+    logger.info("DEBUT CHARGEMENT BIGQUERY")
+    
+    # Récupérer les données depuis XCom
+    data = ti.xcom_pull(task_ids='extract_data', key=API_LABEL)
+    nb_records = ti.xcom_pull(task_ids='extract_data', key='nb_records')
+    
+    if not data:
+        raise ValueError("Aucune donnée à charger dans BigQuery")
+    
+    logger.info(f"{nb_records} enregistrements à charger")
+    
+    try:
+        # Charger directement dans BigQuery depuis la mémoire
+        client = bigquery.Client()
+        table_id = f"{GCP_PROJECT_ID}.staging.raw_weather"
+        
+        job_config = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+            autodetect=True,
+            write_disposition='WRITE_APPEND',
+            create_disposition='CREATE_IF_NEEDED',
+        )
+        
+        logger.info(f"Table destination: {table_id}")
+        
+        load_job = client.load_table_from_json(
+            data,
+            table_id,
+            job_config=job_config
+        )
+        
+        load_job.result()  # Attendre la fin
+        
+        logger.info(f"Chargement BigQuery réussi: {load_job.output_rows} lignes insérées")
+        
+        return table_id
+        
+    except Exception as e:
+        logger.error(f"Erreur chargement BigQuery: {e}")
         raise
 
 
@@ -210,13 +256,17 @@ with DAG(
         python_callable=extract_data,
     )
 
-    upload_task = PythonOperator(
+    upload_task_gcs = PythonOperator(
         task_id='upload_to_gcs',
         python_callable=upload_to_gcs,
         trigger_rule="all_success",
-        outlets=[gcs_weather],
+    )
+    upload_task_bq = PythonOperator(
+        task_id='upload_to_bq',
+        python_callable=upload_to_bq,
+        trigger_rule="all_success",
     )
 
     fin = EmptyOperator(task_id="fin")
 
-    debut >> extract_task >> upload_task >> fin
+    debut >> extract_task >> [upload_task_gcs, upload_task_bq] >> fin

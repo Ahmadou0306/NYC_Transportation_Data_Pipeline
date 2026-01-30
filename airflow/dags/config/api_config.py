@@ -11,6 +11,7 @@ DATASETS_GBQ = {
     "staging":"staging" # nom du dataset est staging 
 }
 
+CONNECTION_BQ_AIRFLOW = os.getenv('CONNECTION_BQ_AIRFLOW','gcp-bigquery')
 
 PROJECT_NAME = "nyc-transport-pipeline"
 

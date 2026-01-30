@@ -169,3 +169,9 @@ def build_gcs_path(date: datetime, source_name: str, frequency: str, extension: 
     
     partition_path, filename = paths[frequency]
     return f"{partition_path}/{filename}"
+
+
+def convert_to_ndjson(data):
+    if not isinstance(data, list):
+        return data
+    return '\n'.join(json.dumps(record) for record in data)

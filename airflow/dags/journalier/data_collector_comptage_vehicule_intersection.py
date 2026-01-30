@@ -6,14 +6,15 @@ from airflow import DAG, Asset
 import requests
 import csv
 import time
-from io import StringIO
+from io import StringIO, BytesIO
+from google.cloud import bigquery
 
 
 import logging
 logger = logging.getLogger(__name__)
 
-from config.api_config import API_CONFIG, PROJECT_NAME, GCS_BUCKET_NAME,ASSET_PATH
-from utils.utilitaire import get_collected_tags, fetch_data_from_url, build_gcs_path
+from config.api_config import ASSET_PATH, PROJECT_NAME, GCS_BUCKET_NAME, API_CONFIG, GCP_PROJECT_ID,CONNECTION_BQ_AIRFLOW
+from utils.utilitaire import get_collected_tags, build_gcs_path, fetch_data_from_url, convert_to_ndjson
 
 COLLECTED_NAME = "comptages_vehicules_intersection"
 API_LABEL = "traffic_volume"
@@ -185,9 +186,67 @@ def upload_to_gcs(ti, **kwargs):
 
         # Retourner le chemin pour traçabilité
         return f"gs://{GCS_BUCKET_NAME}/{gcs_path}"
+
         
     except Exception as e:
         logger.error(f"Erreur lors de l'upload: {e}")
+        raise
+
+
+def upload_to_bq(ti, **kwargs):
+    logger.info("DEBUT CHARGEMENT BIGQUERY")
+    
+    # Récupérer les données depuis XCom
+    all_data = ti.xcom_pull(task_ids='extract_data', key=API_LABEL)
+    nb_records = ti.xcom_pull(task_ids='extract_data', key='nb_records')
+    date_dict = ti.xcom_pull(task_ids='extract_data', key='date')
+    periode = f"{date_dict.get('yr'):04d}-{date_dict.get('m'):02d}-{date_dict.get('d'):02d}"
+
+    logger.info(all_data)
+    
+    if not all_data or len(all_data) < 2:  # Au moins header + 1 ligne
+        logger.error(f"Aucune données à cette période {periode}")
+        return
+    
+    logger.info(f"{nb_records} enregistrements à charger")
+    
+    try:
+        client = bigquery.Client()
+        table_id = f"{GCP_PROJECT_ID}.staging.raw_traffic_volume"
+        
+        # Pour CSV : Convertir en string
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerows(all_data)  # Header + données
+        csv_string = output.getvalue()
+        
+        job_config = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.CSV,
+            skip_leading_rows=1,
+            autodetect=True,
+            write_disposition='WRITE_APPEND',
+            create_disposition='CREATE_IF_NEEDED',
+        )
+        
+        logger.info(f"Table destination: {table_id}")
+        
+        from io import BytesIO
+        csv_bytes = csv_string.encode('utf-8')
+        
+        load_job = client.load_table_from_file(
+            BytesIO(csv_bytes),
+            table_id,
+            job_config=job_config
+        )
+        
+        load_job.result()  # Attendre la fin
+        
+        logger.info(f"Chargement BigQuery réussi: {load_job.output_rows} lignes")
+        
+        return table_id
+        
+    except Exception as e:
+        logger.error(f"Erreur chargement BigQuery: {e}")
         raise
 
 
@@ -234,13 +293,17 @@ with DAG(
         python_callable=extract_data,
     )
 
-    upload_task = PythonOperator(
+    upload_task_gcs = PythonOperator(
         task_id='upload_to_gcs',
         python_callable=upload_to_gcs,
-        trigger_rule="all_success",
-        outlets=[gcs_traffic_volume],
+        trigger_rule="all_success"
+    )
+    upload_task_bq = PythonOperator(
+        task_id='upload_to_bq',
+        python_callable=upload_to_bq,
+        trigger_rule="all_success"
     )
 
     fin = EmptyOperator(task_id="fin")
 
-    debut >> extract_task >> upload_task >> fin
+    debut >> extract_task >> [upload_task_gcs, upload_task_bq] >> fin

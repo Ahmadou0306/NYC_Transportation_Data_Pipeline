@@ -1,17 +1,17 @@
-# 🚕 NYC Transportation Data Pipeline
+# NYC Transportation Data Pipeline
 
-## 📊 Vue d'ensemble
+## Vue d'ensemble
 
 Pipeline ELT end-to-end pour l'analyse des données de transport de New York City utilisant une stack moderne de Data Engineering. Ce projet extrait, transforme et visualise plus de 50 millions d'enregistrements mensuels provenant de multiples sources (APIs, fichiers Parquet) pour fournir des insights sur les patterns de transport urbain, l'impact météorologique et les plaintes citoyennes.
 
-## 🎯 Objectifs du projet
+## Objectifs du projet
 
 - **Centraliser** les données de transport NYC provenant de 8 sources différentes
 - **Analyser** les corrélations entre météo, trafic, courses de taxi et plaintes 311
 - **Visualiser** les patterns de mobilité urbaine via des dashboards interactifs
 - **Démontrer** les compétences en Data Engineering moderne (ELT, dbt, BigQuery, Airflow)
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -80,7 +80,7 @@ Pipeline ELT end-to-end pour l'analyse des données de transport de New York Cit
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 🔧 Stack technique
+## Stack technique
 
 | Catégorie | Technologie | Usage |
 |-----------|-------------|-------|
@@ -92,7 +92,7 @@ Pipeline ELT end-to-end pour l'analyse des données de transport de New York Cit
 | **Langages** | Python 3.9+, SQL | Scripts extraction, transformations |
 | **CI/CD** | GitHub Actions | Tests automatisés (optionnel) |
 
-## 📊 Sources de données
+## Sources de données
 
 ### Données horaires (24x/jour)
 - **NYC Real-Time Traffic Speed** : Vitesse du trafic en temps réel par segment de rue -> https://data.cityofnewyork.us/resource/i4gi-tjb9.json?$limit=10000&$where=data_as_of between '2024-01-15T00:00:00' and '2024-01-15T23:59:59'
@@ -111,7 +111,7 @@ Pipeline ELT end-to-end pour l'analyse des données de transport de New York Cit
 - **For-Hire Vehicle Trips** : Courses de véhicules de location -> https://d37ci6vzurychx.cloudfront.net/trip-data/fhv_tripdata_2024-01.parquet
 - **High Volume FHV Trips** : Courses haute fréquence (Uber, Lyft) -> https://d37ci6vzurychx.cloudfront.net/trip-data/fhvhv_tripdata_2024-01.parquet
 
-## 📈 Métriques du projet
+## Métriques du projet
 
 - **Volume de données** : ~50M+ lignes/mois (taxi seul)
 - **Fréquence de rafraîchissement** : Horaire, quotidien, mensuel
@@ -119,7 +119,7 @@ Pipeline ELT end-to-end pour l'analyse des données de transport de New York Cit
 - **Coût estimé GCP** : ~$10-15/mois (avec optimisations)
 - **Période couverte** : 2024 (MVP) → 2025-2026 (scale)
 
-## 🚀 Installation & Setup
+## Installation & Setup
 
 ### Prérequis
 
