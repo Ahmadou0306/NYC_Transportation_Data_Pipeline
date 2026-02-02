@@ -1,0 +1,131 @@
+version: 2
+
+models:
+  - name: stg_weather
+    description: |
+      Données météorologiques quotidiennes NYC (NOAA).
+      
+      **Source:** NOAA Climate Data Online (API JSON)
+      **Fréquence:** Quotidienne (1 observation/jour)
+      **Volume:** ~365 lignes/an
+      **Période couverte:** 2020-2025
+      **Station:** USW00094728 (LaGuardia Airport - représentatif de NYC)
+      
+      **Métriques clés:**
+      - Températures min/max (°C)
+      - Précipitations (mm)
+      - Neige (mm)
+      
+      **Utilisation:**
+      - Corrélation avec courses taxi (pluie → + de courses)
+      - Impact sur trafic (neige → ralentissements)
+      - Enrichissement des analyses temporelles
+      
+      **Note:** Les valeurs NOAA sont en dixièmes (ex: 250 = 25.0°C)
+      et sont divisées par 10 dans le modèle staging.
+      
+    columns:
+      - name: weather_date
+        description: |
+          Date de l'observation météo (DATE, sans heure)
+          Clé primaire pour jointures avec autres tables temporelles
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "<= current_date()"
+              config:
+                severity: error
+                
+      - name: weather_station
+        description: |
+          Code de la station météo NOAA
+          Valeur constante: "USW00094728" (LaGuardia Airport)
+        tests:
+          - not_null
+          
+      - name: weather_temp_min_celcius
+        description: |
+          Température minimale quotidienne en degrés Celsius
+          
+          **Plages typiques NYC:**
+          - Hiver: -10°C à 5°C
+          - Été: 15°C à 25°C
+          - Records: -26°C (1934) à 32°C (2011)
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: -50
+              max_value: 70
+              inclusive: true
+              config:
+                severity: warn
+                
+      - name: weather_temp_max_celcius
+        description: |
+          Température maximale quotidienne en degrés Celsius
+          
+          **Plages typiques NYC:**
+          - Hiver: 0°C à 10°C
+          - Été: 25°C à 35°C
+          - Records: -15°C (1934) à 41°C (1936)
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: -50
+              max_value: 70
+              inclusive: true
+              config:
+                severity: warn
+                
+      - name: weather_snow_mm
+        description: |
+          Chute de neige quotidienne en millimètres
+          
+          **Interprétation:**
+          - 0 mm = Pas de neige
+          - 1-25 mm = Légère chute
+          - 25-100 mm = Moyenne chute
+          - > 100 mm = Forte chute (perturbations majeures)
+          
+          Note: 0 par défaut si NULL dans source (pas de neige)
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1000
+              inclusive: true
+              config:
+                severity: warn
+                
+      - name: weather_precip_mm
+        description: |
+          Précipitations quotidiennes totales en millimètres
+          Inclut pluie, neige fondue, grêle
+          
+          **Interprétation:**
+          - 0 mm = Temps sec
+          - 1-10 mm = Pluie légère
+          - 10-50 mm = Pluie modérée
+          - > 50 mm = Fortes précipitations
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 500
+              inclusive: true
+              config:
+                severity: warn
+                
+      - name: loaded_at
+        description: "Timestamp de chargement dans la table staging (traçabilité ETL)"
+        tests:
+          - not_null
+          
+    # Tests de cohérence entre colonnes
+    tests:
+      - dbt_utils.expression_is_true:
+          name: temp_max_gte_temp_min
+          expression: "weather_temp_max_celcius >= weather_temp_min_celcius"
+          config:
+            severity: error

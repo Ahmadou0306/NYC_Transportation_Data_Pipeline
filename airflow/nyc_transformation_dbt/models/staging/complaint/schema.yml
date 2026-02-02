@@ -1,0 +1,175 @@
+version: 2
+
+models:
+  - name: stg_311_requests
+    description: |
+      Plaintes et demandes de service non-urgentes (311) liées au transport urbain.
+      
+      **Source:** NYC 311 Service Requests API (JSON)
+      **Fréquence:** Quotidienne
+      **Volume:** ~2,600 lignes/jour (après filtrage transport)
+      **Période couverte:** 2020-2025
+      
+      **Filtres appliqués (réduit de 19,560 → 2,600 lignes/jour):**
+      - Seulement plaintes transport-related:
+        * Parking (Illegal Parking, Blocked Driveway)
+        * Traffic (Traffic Signal Condition)
+        * Street (Street Light, Street Condition)
+        * Noise (Vehicle, Street/Sidewalk)
+      - Borough obligatoire
+      - Géolocalisation obligatoire (lat/long non NULL)
+      
+      **Données exclues:**
+      - Plaintes arbres/végétation (46% des données brutes)
+      - Plaintes ordures/collecte
+      - Plaintes bâtiments (plomberie, électricité)
+      - Plaintes COVID
+      
+    columns:
+      - name: request_id
+        description: |
+          Identifiant unique de la plainte (unique_key converti en STRING)
+          Peut servir de référence pour suivi
+        tests:
+          - unique
+          - not_null
+          
+      - name: request_created_at
+        description: "Date et heure de création de la plainte par le citoyen"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "<= current_timestamp()"
+              config:
+                severity: error
+                
+      - name: request_closed_at
+        description: |
+          Date et heure de fermeture de la plainte
+          NULL si plainte encore ouverte (status != 'Closed')
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "<= current_timestamp()"
+              where: "request_closed_at IS NOT NULL"
+              
+      - name: complaint_type
+        description: |
+          Type de plainte (seulement transport-related après filtrage)
+          
+          **Catégories principales:**
+          - Illegal Parking (~3.3%)
+          - Blocked Driveway (~2.0%)
+          - Traffic Signal Condition (~1.9%)
+          - Street Light Condition (~1.8%)
+          - Noise - Vehicle (~1.3%)
+          - Street Condition (~0.8%)
+          - Noise - Street/Sidewalk (~3.1%)
+        tests:
+          - not_null
+                
+      - name: complaint_descriptor
+        description: |
+          Descripteur détaillé de la plainte (sous-catégorie)
+          Fournit plus de précisions sur complaint_type
+          
+      - name: agency
+        description: |
+          Code de l'agence responsable du traitement
+          Exemples: NYPD, DOT, DSNY, DEP
+        tests:
+          - not_null
+          
+      - name: agency_name
+        description: |
+          Nom complet de l'agence
+          Exemple: "Department of Transportation", "Police Department"
+          
+      - name: status
+        description: |
+          Statut de la plainte:
+          - Open = Encore en cours
+          - Closed = Résolue/Fermée
+          - Pending = En attente
+          - Assigned = Assignée à un agent
+          - In Progress = Traitement en cours
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Open', 'Closed', 'Pending', 'Assigned', 'In Progress', 'Started']
+              quote: true
+              config:
+                severity: warn  # Warning si nouvelles valeurs
+                
+      - name: borough
+        description: |
+          Borough de New York où se situe la plainte
+          Fusionné de plusieurs colonnes sources (borough, taxi_company_borough, park_borough)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['BRONX', 'BROOKLYN', 'MANHATTAN', 'QUEENS', 'STATEN ISLAND', 'Unspecified']
+              quote: true
+              
+      - name: latitude
+        description: |
+          Latitude GPS de la plainte (WGS84)
+          Plage NYC: 40.4 à 41.0
+        tests:
+          - not_null  # Obligatoire car filtré dans le modèle
+          - dbt_utils.accepted_range:
+              min_value: 40.4
+              max_value: 41.0
+              inclusive: true
+              
+      - name: longitude
+        description: |
+          Longitude GPS de la plainte (WGS84)
+          Plage NYC: -74.3 à -73.7
+        tests:
+          - not_null  # Obligatoire car filtré dans le modèle
+          - dbt_utils.accepted_range:
+              min_value: -74.3
+              max_value: -73.7
+              inclusive: true
+              
+      - name: zip_code
+        description: |
+          Code postal (converti en STRING pour préserver les leading zeros)
+          Peut être NULL si adresse imprécise
+                
+      - name: location_address
+        description: |
+          Adresse unifiée de la plainte
+          Fusionnée via COALESCE(incident_address, street_name, intersection_street_1)
+          Peut être NULL si seules lat/long disponibles
+          
+      - name: resolution_description
+        description: |
+          Description de la résolution apportée par l'agence
+          NULL si plainte encore ouverte
+          
+      - name: resolution_updated_at
+        description: |
+          Date de dernière mise à jour de la résolution
+          Peut être postérieure à request_closed_at
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "<= current_timestamp()"
+              where: "resolution_updated_at IS NOT NULL"
+              
+      - name: loaded_at
+        description: "Timestamp de chargement dans la table staging"
+        tests:
+          - not_null
+          
+    tests:
+      - dbt_utils.expression_is_true:
+          name: closed_status_has_closed_date
+          expression: "NOT (status = 'Closed' AND request_closed_at IS NULL)"
+          config:
+            severity: warn  # Warn car parfois status fermé avant date enregistrée
+            
+      - dbt_utils.expression_is_true:
+          name: closed_date_after_created
+          expression: "request_closed_at >= request_created_at"
+          where: "request_closed_at IS NOT NULL"

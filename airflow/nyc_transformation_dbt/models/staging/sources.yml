@@ -1,0 +1,24 @@
+version: 2
+
+sources:
+  - name: raw_data
+    database: training-gcp-484513
+    schema: staging
+    tables:
+      - name: raw_weather
+        description: "Données météo brutes NOAA"
+      - name: raw_traffic_speed
+        description: "Vitesse du trafic en temps réel par segment de rue brutes"
+      - name: raw_traffic_volume
+        description: "Données brutes Comptages de véhicules par intersection"
+      - name: raw_311_requests
+        description: "Données brutes Plaintes et demandes de service non-urgentes"
+      - name: raw_yellow_axi_vehicule_trips
+        description: "Données brutes Courses de taxis jaunes"
+      - name: raw_for_hire_vehicule_trips
+        description: "Données brutes Courses de véhicules de location"
+      - name: raw_high_volume_vehicule_trips
+        description: "Données brutes Courses haute fréquence (Uber, Lyft)"
+
+
+	

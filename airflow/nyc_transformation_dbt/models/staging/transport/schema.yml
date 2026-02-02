@@ -1,0 +1,593 @@
+version: 2
+
+models:
+  - name: stg_high_volume_vehicule_trips
+    description: |
+      Courses de véhicules haute fréquence (High Volume For-Hire Vehicles) - Uber, Lyft, Via, Juno.
+      
+      **Source:** TLC HVFHV Trip Record Data (fichiers Parquet mensuels)
+      **Fréquence:** Mensuelle
+      **Volume:** ~20M lignes/mois (le plus volumineux!)
+      **Période couverte:** 2019-2025 (HVFHV introduit en février 2019)
+      
+      **Particularités vs Yellow Taxi / FHV:**
+      - **4 timestamps** au lieu de 2 (request, on_scene, pickup, dropoff)
+      - **Tarification détaillée** (base_fare, tips, driver_pay séparés)
+      - **Flags de partage** (shared rides, wheelchair accessible)
+      - **Distance ET temps** fournis (contrairement à FHV)
+      
+      **Filtres appliqués:**
+      - Dates cohérentes (pickup <= dropoff, pas de dates futures)
+      - Location IDs valides (1-265)
+      - Métriques >= 0
+      - Ordre chronologique des 4 timestamps respecté
+      
+      **Type de service:** HVFHV (pour distinction dans l'union)
+      
+    columns:
+      - name: hvfhs_license_num
+        description: |
+          Numéro de licence TLC de l'opérateur HVFHV:
+          - HV0002 = Juno
+          - HV0003 = Uber
+          - HV0004 = Via
+          - HV0005 = Lyft
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['HV0002', 'HV0003', 'HV0004', 'HV0005']
+              quote: true
+              config:
+                severity: warn  # Warn car de nouveaux opérateurs peuvent apparaître
+                
+      - name: dispatching_base_num
+        description: |
+          Numéro de licence de la base de dispatch TLC
+          Format: B##### (ex: B02764, B02617)
+        tests:
+          - not_null
+          
+      - name: originating_base_num
+        description: |
+          Numéro de la base d'origine
+          Souvent identique à dispatching_base_num
+          
+      - name: request_datetime
+        description: |
+          Timestamp 1/4: Quand le passager a demandé la course via l'app
+          Peut être NULL pour anciennes données
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "<= current_timestamp()"
+              where: "request_datetime IS NOT NULL"
+              
+      - name: on_scene_datetime
+        description: |
+          Timestamp 2/4: Quand le chauffeur est arrivé au point de pickup
+          Peut être NULL si pas enregistré
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: ">= request_datetime"
+              where: "on_scene_datetime IS NOT NULL AND request_datetime IS NOT NULL"
+              config:
+                severity: warn
+                
+      - name: pickup_datetime
+        description: |
+          Timestamp 3/4: Quand le passager est monté dans le véhicule
+          **Colonne clé pour analyses temporelles**
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "<= current_timestamp()"
+              
+      - name: dropoff_datetime
+        description: |
+          Timestamp 4/4: Quand le passager est descendu du véhicule
+          **Utilisé pour calculer la durée réelle de la course**
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= pickup_datetime"
+              
+      - name: pickup_location_id
+        description: "Zone TLC de prise en charge (1-265)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+              inclusive: true
+              
+      - name: dropoff_location_id
+        description: "Zone TLC de dépose (1-265)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+              inclusive: true
+              
+      - name: trip_distance_miles
+        description: |
+          Distance de la course en miles
+          **Avantage vs FHV standard:** HVFHV fournit cette métrique!
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 200
+              inclusive: true
+              config:
+                severity: warn
+                
+      - name: trip_time_seconds
+        description: |
+          Durée de la course en secondes
+          Calculé comme: dropoff_datetime - pickup_datetime
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 86400  # Max 24h
+              inclusive: true
+              config:
+                severity: warn
+                
+      - name: base_passenger_fare
+        description: |
+          Tarif de base payé par le passager (en USD)
+          **N'inclut PAS:** tips, tolls, taxes, surcharges
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1000
+              inclusive: true
+              config:
+                severity: warn
+                
+      - name: tolls_amount
+        description: "Montant total des péages (en USD)"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 50
+              where: "tolls_amount IS NOT NULL"
+              
+      - name: black_car_fund
+        description: |
+          Contribution au Black Car Fund (BCF)
+          Taxe de $0.02 par course ou 2.5% du fare (selon tarif)
+          Fonds pour accident/invalidité des chauffeurs
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 10
+              where: "black_car_fund IS NOT NULL"
+              
+      - name: sales_tax
+        description: |
+          Taxe de vente NYC (8.875%)
+          Appliquée sur base_passenger_fare + tolls + surcharges
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "sales_tax IS NOT NULL"
+              
+      - name: congestion_surcharge
+        description: |
+          Taxe de congestion (introduite 2019):
+          - $2.50 pour pickups dans Manhattan sud du 96th St
+          - $2.75 depuis 2022
+                
+      - name: airport_fee
+        description: |
+          Frais aéroport ($2.50 pour pickups JFK/LaGuardia)
+          Introduit progressivement depuis 2020
+                
+      - name: tip_amount
+        description: |
+          Pourboire donné par le passager (en USD)
+          **Inclut tips in-app** contrairement aux Yellow Taxis cash
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 500
+              where: "tip_amount IS NOT NULL"
+              config:
+                severity: warn
+                
+      - name: driver_pay
+        description: |
+          Montant payé au chauffeur par la compagnie (en USD)
+          **Unique aux HVFHV:** permet d'analyser la commission de la plateforme
+          Commission = base_passenger_fare - driver_pay
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1000
+              where: "driver_pay IS NOT NULL"
+              config:
+                severity: warn
+                
+      - name: shared_request_flag
+        description: |
+          Le passager a-t-il demandé une course partagée? (UberPool, Lyft Line)
+          - Y = Oui
+          - N = Non
+          - '' (empty) = Non renseigné
+        tests:
+          - accepted_values:
+              values: ['Y', 'N', '']
+              quote: true
+              config:
+                severity: warn
+                
+      - name: shared_match_flag
+        description: |
+          La course a-t-elle effectivement été partagée avec un autre passager?
+          - Y = Oui, partagée
+          - N = Non, finalement seul(e)
+          - '' = Non applicable
+        tests:
+          - accepted_values:
+              values: ['Y', 'N', '']
+              quote: true
+              config:
+                severity: warn
+                
+      - name: access_a_ride_flag
+        description: |
+          Course Access-A-Ride (service pour personnes handicapées):
+          - Y = Oui
+          - N = Non
+          - '' ou ' ' = Non renseigné
+        tests:
+          - accepted_values:
+              values: ['Y', 'N', '', ' ']
+              quote: true
+              config:
+                severity: warn
+                
+      - name: wav_request_flag
+        description: |
+          Wheelchair Accessible Vehicle demandé?
+          - Y = Oui, WAV demandé
+          - N = Non
+          - '' = Non renseigné
+                
+      - name: wav_match_flag
+        description: |
+          Wheelchair Accessible Vehicle effectivement fourni?
+          - Y = Oui, WAV fourni
+          - N = Non (véhicule standard fourni malgré demande)
+          - '' = Non applicable
+        tests:
+          - accepted_values:
+              values: ['Y', 'N', '']
+              quote: true
+              config:
+                severity: warn
+                
+      - name: service_type
+        description: |
+          Type de service (pour union avec Yellow Taxi/FHV)
+          Valeur fixe: 'HVFHV'              
+      - name: loaded_at
+        description: "Timestamp de chargement dans la table staging"
+        tests:
+          - not_null
+          
+    # Tests entre colonnes
+    tests:
+      - dbt_utils.expression_is_true:
+          name: hvfhv_chronological_timestamps
+          expression: |
+            (request_datetime IS NULL OR on_scene_datetime IS NULL OR on_scene_datetime >= request_datetime)
+            AND (on_scene_datetime IS NULL OR pickup_datetime >= on_scene_datetime)
+            AND dropoff_datetime >= pickup_datetime
+          config:
+            severity: error
+            
+      - dbt_utils.expression_is_true:
+          name: hvfhv_trip_duration_realistic
+          expression: "TIMESTAMP_DIFF(dropoff_datetime, pickup_datetime, HOUR) <= 24"
+          config:
+            severity: warn
+            
+      - dbt_utils.expression_is_true:
+          name: hvfhv_shared_flags_coherent
+          expression: "NOT (shared_match_flag = 'Y' AND shared_request_flag = 'N')"
+          config:
+            severity: warn
+            
+
+  - name: stg_for_hire_vehicule_trips
+    description: |
+      Courses de véhicules de location (For-Hire Vehicles) hors Uber/Lyft.
+      
+      **Source:** TLC FHV Trip Record Data (fichiers Parquet mensuels)
+      **Fréquence:** Mensuelle
+      **Volume:** ~15M lignes/mois
+      **Période couverte:** 2020-2025
+      
+      **Note importante:**
+      Les FHV ne fournissent PAS les métriques détaillées (fare, distance, passenger_count)
+      contrairement aux Yellow Taxis. Seules les infos de base sont disponibles.
+      
+      **Filtres appliqués:**
+      - Location IDs convertis de FLOAT à INT via ROUND()
+      - Dates cohérentes (pickup <= dropoff)
+      - Pas de dates futures
+      
+    columns:  
+      - name: dispatching_base_num
+        description: |
+          Numéro de licence de la base de dispatch
+          Format: B##### (ex: B02764)
+          Identifie la compagnie qui a dispatché le véhicule
+        tests:
+          - not_null
+          
+      - name: affiliated_base_number
+        description: |
+          Numéro de la base affiliée
+          Peut être identique à dispatching_base_num
+        tests:
+          - not_null
+          
+      - name: pickup_datetime
+        description: "Date et heure de prise en charge"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "<= current_timestamp()"
+              
+      - name: dropoff_datetime
+        description: "Date et heure de dépose"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= pickup_datetime"
+              
+      - name: pickup_location_id
+        description: |
+          Zone TLC de prise en charge (1-265)
+          Note: Converti de FLOAT à INT via ROUND() (anomalie des données sources)
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+              
+      - name: dropoff_location_id
+        description: |
+          Zone TLC de dépose (1-265)
+          Note: Converti de FLOAT à INT via ROUND()
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+              
+      - name: service_type
+        description: |
+          Type de service (pour union avec Yellow Taxi/HVFHV)
+          Valeur fixe: 'FHV'             
+      - name: loaded_at
+        description: "Timestamp de chargement dans la table staging"
+        tests:
+          - not_null
+          
+    tests:
+      - dbt_utils.expression_is_true:
+          name: fhv_trip_duration_realistic
+          expression: "TIMESTAMP_DIFF(dropoff_datetime, pickup_datetime, HOUR) <= 24"
+          config:
+            severity: warn
+
+  - name: stg_yellow_taxi_trips
+    description: |
+      Courses de taxis jaunes NYC nettoyées et standardisées.
+      
+      **Source:** TLC Trip Record Data (fichiers Parquet mensuels)
+      **Fréquence:** Mensuelle
+      **Volume:** ~3M lignes/mois
+      **Période couverte:** 2020-2025
+      
+      **Filtres appliqués:**
+      - Dates cohérentes (pickup <= dropoff, pas de dates futures)
+      - Location IDs valides (1-265)
+      - Passagers >= 0
+      - Montants >= 0
+      
+      **Type de service:** Yellow Taxi (pour distinction dans l'union avec FHV/HVFHV)
+      
+    columns:
+      - name: vendor_id
+        description: |
+          Fournisseur de technologie embarquée:
+          - 1 = Creative Mobile Technologies, LLC
+          - 2 = VeriFone Inc.
+
+      - name: pickup_datetime
+        description: "Date et heure de prise en charge du passager"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "<= current_timestamp()"
+              
+      - name: dropoff_datetime
+        description: "Date et heure de dépose du passager"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= pickup_datetime"
+              
+      - name: pickup_location_id
+        description: |
+          Zone TLC de prise en charge (1-265)
+          - 264 = Unknown
+          - 265 = N/A
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+              inclusive: true
+              
+      - name: dropoff_location_id
+        description: |
+          Zone TLC de dépose (1-265)
+          - 264 = Unknown
+          - 265 = N/A
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+              inclusive: true
+              
+      - name: passenger_count
+        description: "Nombre de passagers (saisi par le chauffeur)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 9
+              inclusive: true
+              config:
+                severity: warn  # Warning si > 9 (limousines)
+                
+      - name: trip_distance_miles
+        description: "Distance du trajet en miles (enregistrée par le compteur)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+              config:
+                severity: warn  # Warning si > 100 miles
+                
+      - name: rate_code_id
+        description: |
+          Type de tarif appliqué en fin de course:
+          - 1 = Standard rate
+          - 2 = JFK
+          - 3 = Newark
+          - 4 = Nassau or Westchester
+          - 5 = Negotiated fare
+          - 6 = Group ride                
+      - name: payment_type_id
+        description: |
+          Mode de paiement:
+          - 1 = Credit card
+          - 2 = Cash
+          - 3 = No charge
+          - 4 = Dispute
+          - 5 = Unknown
+          - 6 = Voided trip                
+      - name: fare_amount
+        description: "Montant du tarif de base calculé par le compteur (en USD)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 500
+              inclusive: true
+              config:
+                severity: warn
+                
+      - name: extra_charges
+        description: "Suppléments (heures de pointe $1, nuit $0.50)"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 10
+              where: "extra_charges IS NOT NULL"
+              
+      - name: mta_tax
+        description: "Taxe MTA ($0.50 automatique pour tous les trajets)"
+        
+      - name: tip_amount
+        description: |
+          Pourboire (en USD)
+          Note: Seulement pour paiements par carte (cash tips non enregistrés)
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 200
+              where: "tip_amount IS NOT NULL"
+              config:
+                severity: warn
+                
+      - name: tolls_amount
+        description: "Montant total des péages payés durant le trajet (en USD)"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 50
+              where: "tolls_amount IS NOT NULL"
+              
+      - name: improvement_surcharge
+        description: "Taxe d'amélioration ($0.30 depuis 2015)"
+        
+      - name: total_amount
+        description: |
+          Montant total facturé au passager (en USD)
+          Note: N'inclut pas les pourboires en cash
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1000
+              inclusive: true
+              config:
+                severity: warn
+                
+      - name: congestion_surcharge
+        description: "Taxe de congestion ($2.50 ou $2.75 selon période, introduite 2019)"
+        
+      - name: airport_fee
+        description: |
+          Frais aéroport ($1.25 pour pickups aux aéroports)
+          Introduit en 2015, peut être NULL pour anciennes données
+          
+      - name: store_and_fwd_flag
+        description: |
+          Indicateur de stockage local puis envoi différé:
+          - Y = trip record held in vehicle memory before sending
+          - N = trip record not held in vehicle memory
+        tests:
+          - accepted_values:
+              values: ['Y', 'N']
+              quote: true
+              config:
+                severity: warn
+                
+      - name: service_type
+        description: |
+          Type de service (pour union avec FHV/HVFHV)
+          Valeur fixe: 'Yellow Taxi'
+              
+      - name: loaded_at
+        description: "Timestamp de chargement dans la table staging (traçabilité ETL)"
+        tests:
+          - not_null
+          
+    # Tests entre colonnes
+    tests:
+      - dbt_utils.expression_is_true:
+          name: dropoff_after_pickup
+          expression: "dropoff_datetime >= pickup_datetime"
+          config:
+            severity: error
+            
+      - dbt_utils.expression_is_true:
+          name: trip_duration_realistic
+          expression: "TIMESTAMP_DIFF(dropoff_datetime, pickup_datetime, HOUR) <= 12"
+          config:
+            severity: warn

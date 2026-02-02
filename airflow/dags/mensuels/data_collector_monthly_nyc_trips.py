@@ -44,7 +44,7 @@ def extract_and_load(api_label, **kwargs):
     for attempt in range(max_retries):
         url = f"{base_url}_{date}.{format_response}"
         try:
-            results = fetch_data_from_url(url, timeout=120)
+            results = fetch_data_from_url(url, timeout=240)
             
             if results['format'] != 'parquet':
                 raise Exception(f"Format incorrect, attendu: parquet")
@@ -152,7 +152,7 @@ with DAG(
     schedule='0 22 1 * *',  # 1er du mois à 22h
     catchup=True,
     max_active_runs=1,
-    tags=get_collected_tags(COLLECTED_NAME, "month"),
+    tags=get_collected_tags(COLLECTED_NAME, "monthly"),
 ) as dag:
     
     debut = EmptyOperator(task_id="debut")

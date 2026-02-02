@@ -1,0 +1,118 @@
+version: 2
+
+models:
+  - name: stg_traffic_speed
+    description: |
+      Vitesse du trafic NYC en temps quasi-réel par segment de rue.
+      
+      **Source:** NYC DOT Real-Time Traffic Speed Data (API JSON)
+      **Fréquence:** Horaire (mesures toutes les 5 minutes)
+      **Volume:** ~50k lignes/heure
+      **Période couverte:** 2020-2025
+      
+      **Métriques clés:**
+      - Vitesse moyenne par segment de rue
+      - Temps de trajet sur le segment
+      - Status code (0 = normal, 1+ = problème)
+      
+      **Utilisation:**
+      - Détection des embouteillages (speed < 10 mph)
+      - Analyse des heures de pointe
+      - Corrélation avec météo et événements
+      
+    columns:  
+      - name: link_id
+        description: |
+          Identifiant unique du segment de route
+          Correspond au système TRANSCOM NYC
+        tests:
+          - not_null
+          
+      - name: transcom_id
+        description: "ID système TRANSCOM (peut être différent de link_id)"
+        tests:
+          - not_null
+          
+      - name: link_name
+        description: |
+          Nom descriptif du segment
+          Exemple: "BWB S Toll Plaza - Queens Anchorage"
+        tests:
+          - not_null
+          
+      - name: borough
+        description: "Borough de New York où se situe le segment"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Bronx', 'Brooklyn', 'Manhattan', 'Queens', 'Staten Island']
+              
+      - name: owner
+        description: |
+          Propriétaire/gestionnaire de la route:
+          - NYC_DOT_LIC = NYC Department of Transportation
+          - MTA = Metropolitan Transportation Authority
+          - Port Authority, etc.
+        tests:
+          - not_null
+          
+      - name: measurement_timestamp
+        description: "Date et heure de la mesure de vitesse (précision: 5 minutes)"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "<= current_timestamp()"
+              
+      - name: speed_mph
+        description: |
+          Vitesse moyenne du trafic en miles par heure
+          
+          **Interprétation:**
+          - < 10 mph = Embouteillage sévère
+          - 10-25 mph = Trafic dense
+          - 25-40 mph = Trafic fluide
+          - > 40 mph = Circulation libre
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+              config:
+                severity: warn
+                
+      - name: travel_time_seconds
+        description: |
+          Temps de trajet estimé pour parcourir le segment (en secondes)
+          Calculé selon la vitesse et la longueur du segment
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 7200  # Max 2 heures
+              inclusive: true
+              
+      - name: status_code
+        description: |
+          Code de statut de la mesure:
+          - 0 = Normal (données fiables)
+          - 1 = Warning (données potentiellement imprécises)
+          - 2 = Error (problème capteur)
+          - 3 = Maintenance
+                
+      - name: link_points
+        description: |
+          Coordonnées GPS définissant le tracé du segment
+          Format: "lat1,lon1 lat2,lon2 ..."
+          Utilisé pour visualisation cartographique
+          
+      - name: encoded_poly_line
+        description: |
+          Polyline encodée (format Google)
+          Alternative compressée à link_points
+          Utilisé pour affichage sur Google Maps
+          
+      - name: loaded_at
+        description: "Timestamp de chargement dans la table staging"
+        tests:
+          - not_null
