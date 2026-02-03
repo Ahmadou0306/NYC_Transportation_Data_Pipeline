@@ -11,6 +11,11 @@ transport_related AS (
     SELECT *
     FROM source
     WHERE 
+        unique_key IS NOT NULL
+        AND created_date IS NOT NULL
+        AND borough IS NOT NULL
+        AND (latitude IS NOT NULL AND longitude IS NOT NULL)
+        /*
         -- Critère 1 : Types de plaintes pertinents
         (
             complaint_type LIKE '%Parking%'
@@ -25,6 +30,7 @@ transport_related AS (
         AND created_date IS NOT NULL
         AND borough IS NOT NULL
         AND (latitude IS NOT NULL AND longitude IS NOT NULL)
+        */
 ),
 
 -- Nettoyage des colonnes

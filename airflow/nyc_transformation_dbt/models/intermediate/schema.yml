@@ -1,0 +1,274 @@
+version: 2
+
+models:
+  - name: int_311_by_zone_daily
+    columns:
+      - name: request_date
+        tests:
+          - not_null
+      - name: borough
+        tests:
+          - not_null
+      - name: complaint_type
+        tests:
+          - not_null
+      - name: status
+        tests:
+          - not_null
+      - name: total_complaints
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: closed_complaints
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              where: "closed_complaints IS NOT NULL"
+      - name: pct_closed
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "pct_closed IS NOT NULL"
+      - name: avg_resolution_days
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 365
+              where: "avg_resolution_days IS NOT NULL"
+
+  - name: int_311_resolution_performance
+    columns:
+      - name: month
+        tests:
+          - not_null
+      - name: agency
+        tests:
+          - not_null
+      - name: complaint_type
+        tests:
+          - not_null
+      - name: total_complaints
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: avg_resolution_days
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 365
+              where: "avg_resolution_days IS NOT NULL"
+      - name: median_resolution_days
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 365
+              where: "median_resolution_days IS NOT NULL"
+      - name: pct_closed
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "pct_closed IS NOT NULL"
+      - name: performance_score
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "performance_score IS NOT NULL"
+
+  - name: int_taxi_demand_hourly
+    columns:
+      - name: pickup_location_id
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+      - name: hour_of_day
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 23
+      - name: day_of_week
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 7
+      - name: is_weekend
+        tests:
+          - not_null
+      - name: time_slot
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Morning', 'Afternoon', 'Evening', 'Night']
+      - name: total_pickups
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: avg_daily_pickups
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              where: "avg_daily_pickups IS NOT NULL"
+
+  - name: int_traffic_hourly_avg
+    columns:
+      - name: borough
+        tests:
+          - not_null
+      - name: measurement_hour
+        tests:
+          - not_null
+      - name: hour_of_day
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 23
+      - name: day_of_week
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 7
+      - name: status_code
+      - name: avg_speed_mph
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+      - name: is_congested
+      - name: is_severe_congestion
+        tests:
+          - not_null
+
+  - name: int_trips_enriched
+    columns:
+      - name: service_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Yellow Taxi', 'HVFHV', 'FHV']
+      - name: pickup_datetime
+        tests:
+          - not_null
+      - name: dropoff_datetime
+        tests:
+          - not_null
+      - name: pickup_location_id
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+      - name: dropoff_location_id
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+      - name: trip_duration_minutes
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1440
+      - name: distance_category
+        tests:
+          - accepted_values:
+              values: ['Intra-quartier', 'Local', 'Cross-borough', 'Longue distance']
+              where: "distance_category IS NOT NULL"
+      - name: is_snowy
+        tests:
+          - not_null
+      - name: is_rainy
+        tests:
+          - not_null
+      - name: is_rush_hour
+        tests:
+          - not_null
+
+  - name: int_trips_with_traffic
+    columns:
+      - name: service_type
+        tests:
+          - not_null
+      - name: pickup_datetime
+        tests:
+          - not_null
+      - name: pickup_borough
+        tests:
+          - not_null
+      - name: pickup_location_id
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+      - name: traffic_avg_speed_mph
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "traffic_avg_speed_mph IS NOT NULL"
+      - name: traffic_is_congested
+      - name: is_stuck_in_traffic
+        tests:
+          - not_null
+      - name: estimated_duration_minutes
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1440
+              where: "estimated_duration_minutes IS NOT NULL"
+
+  - name: int_weather_impact_daily
+    columns:
+      - name: weather_date
+        tests:
+          - unique
+          - not_null
+      - name: day_of_week
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 7
+      - name: month
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 12
+      - name: is_weekend
+        tests:
+          - not_null
+      - name: weather_condition
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Clear', 'Light Rain', 'Moderate Rain', 'Heavy Rain', 'Light Snow', 'Heavy Snow']
+      - name: total_trips
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: avg_traffic_speed_mph
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+      - name: total_311_complaints
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0

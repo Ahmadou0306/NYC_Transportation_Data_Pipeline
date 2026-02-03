@@ -28,8 +28,7 @@ WITH source AS (
         location_address,
         resolution_description,
         resolution_updated_at,
-        loaded_at,
-    FROM {{source("staging_data","stg_311_requests")}}
+    FROM {{ref("stg_311_requests")}}
 ),
 
 zone_plus_plainte AS (
@@ -58,11 +57,12 @@ zone_plus_plainte AS (
         COUNT(DISTINCT agency) AS unique_agencies,
         COUNT(DISTINCT zip_code) AS unique_zip_codes,
 
-    FROM 311_requests_enriched
+    FROM source
     GROUP BY 
         DATE(request_created_at),
         borough,
-        complaint_type
+        complaint_type,
+        status
 )
 
 SELECT * FROM zone_plus_plainte

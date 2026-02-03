@@ -23,7 +23,6 @@ yellow_enriched AS (
         y.dropoff_datetime,
         y.pickup_location_id,
         y.dropoff_location_id,
-        y.loaded_at,
         
         -- Métriques communes
         TIMESTAMP_DIFF(y.dropoff_datetime, y.pickup_datetime, MINUTE) AS trip_duration_minutes,
@@ -61,7 +60,6 @@ hvfhv_enriched AS (
         h.dropoff_datetime,
         h.pickup_location_id,
         h.dropoff_location_id,
-        h.loaded_at,
         
         TIMESTAMP_DIFF(h.dropoff_datetime, h.pickup_datetime, MINUTE) AS trip_duration_minutes,
         h.trip_distance_miles,
@@ -91,16 +89,15 @@ hvfhv_enriched AS (
 -- FHV enrichi
 fhv_enriched AS (
     SELECT 
-        f.service_type,  -- 'FHV'
+        f.service_type,
         f.pickup_datetime,
         f.dropoff_datetime,
         f.pickup_location_id,
         f.dropoff_location_id,
-        f.loaded_at,
         
         TIMESTAMP_DIFF(f.dropoff_datetime, f.pickup_datetime, MINUTE) AS trip_duration_minutes,
-        NULL AS trip_distance_miles,  -- FHV n'a pas cette info
-        NULL AS distance_category,
+        CAST(NULL AS FLOAT64) AS trip_distance_miles,  -- Typer le NULL
+        CAST(NULL AS STRING) AS distance_category,     -- Typer le NULL
         
         CASE WHEN w.weather_snow_mm > 0 THEN TRUE ELSE FALSE END AS is_snowy,
         CASE WHEN w.weather_precip_mm > 0 THEN TRUE ELSE FALSE END AS is_rainy,

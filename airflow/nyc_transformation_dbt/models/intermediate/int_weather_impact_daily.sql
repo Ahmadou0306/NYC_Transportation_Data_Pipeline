@@ -13,8 +13,8 @@
 WITH weather AS (
     SELECT
         weather_date,
-        weather_temp_min_celsius,
-        weather_temp_max_celsius,
+        weather_temp_min_celcius,
+        weather_temp_max_celcius,
         weather_precip_mm,
         weather_snow_mm,
         
@@ -32,7 +32,7 @@ WITH weather AS (
         CASE WHEN weather_snow_mm > 10 THEN TRUE ELSE FALSE END AS is_extreme_snow,
         CASE WHEN weather_precip_mm > 50 THEN TRUE ELSE FALSE END AS is_extreme_rain,
         CASE 
-            WHEN weather_temp_max_celsius > 35 OR weather_temp_min_celsius < -10 
+            WHEN weather_temp_max_celcius > 35 OR weather_temp_min_celcius < -10 
             THEN TRUE 
             ELSE FALSE 
         END AS is_extreme_temperature
@@ -84,7 +84,10 @@ daily_traffic AS (
         ROUND(MAX(avg_speed_mph), 1) AS max_speed_mph,
         
         -- Congestion
-        ROUND(AVG(pct_congested), 2) AS avg_pct_congested,
+        ROUND(
+            AVG(CASE WHEN is_congested THEN 100 ELSE 0 END),
+            2
+        ) AS avg_pct_congested,
         SUM(severe_congestion_count) AS total_severe_congestion_events,
         SUM(moderate_congestion_count) AS total_moderate_congestion_events,
         
@@ -105,8 +108,8 @@ daily_complaints AS (
         
         -- Volume total
         SUM(total_complaints) AS total_complaints,
-        SUM(closed_count) AS closed_complaints,
-        SUM(open_count) AS open_complaints,
+        SUM(closed_complaints) AS closed_complaints,
+        SUM(open_complaints) AS open_complaints,
         
         -- Par type (top 3)
         SUM(CASE WHEN complaint_type LIKE '%Parking%' THEN total_complaints ELSE 0 END) AS parking_complaints,
@@ -138,8 +141,8 @@ weather_impact AS (
         
         -- Conditions météo
         w.weather_condition,
-        w.weather_temp_min_celsius,
-        w.weather_temp_max_celsius,
+        w.weather_temp_min_celcius,
+        w.weather_temp_max_celcius,
         w.weather_precip_mm,
         w.weather_snow_mm,
         w.is_extreme_snow,

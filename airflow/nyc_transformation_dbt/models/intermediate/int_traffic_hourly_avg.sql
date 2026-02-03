@@ -14,9 +14,9 @@ WITH traffic_speed_enriched AS (
     SELECT
         borough,
         DATE_TRUNC(measurement_timestamp, HOUR) AS measurement_hour,
-        EXTRACT(HOUR FROM measurement_hour) AS hour_of_day,
-        EXTRACT(DAYOFWEEK FROM measurement_hour) AS day_of_week,
-        status_code,  -- ← Garder la colonne originale
+        EXTRACT(HOUR FROM DATE_TRUNC(measurement_timestamp, HOUR)) AS hour_of_day,
+        EXTRACT(DAYOFWEEK FROM DATE_TRUNC(measurement_timestamp, HOUR)) AS day_of_week,
+        status_code,
         
         -- Métriques agrégées
         COUNT(*) AS total_measurements,
@@ -55,7 +55,9 @@ WITH traffic_speed_enriched AS (
     GROUP BY 
         borough,
         DATE_TRUNC(measurement_timestamp, HOUR),
-        status_code
+        status_code,
+        EXTRACT(HOUR FROM DATE_TRUNC(measurement_timestamp, HOUR)),
+        EXTRACT(DAYOFWEEK FROM DATE_TRUNC(measurement_timestamp, HOUR))
 )
 
 SELECT * FROM traffic_speed_enriched

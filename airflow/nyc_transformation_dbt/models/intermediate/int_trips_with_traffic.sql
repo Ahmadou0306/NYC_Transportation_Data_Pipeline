@@ -59,7 +59,6 @@ trips_with_traffic AS (
         traf.avg_speed_mph AS traffic_avg_speed_mph,
         traf.is_congested AS traffic_is_congested,
         traf.is_severe_congestion AS traffic_is_severe_congestion,
-        traf.pct_congested AS traffic_pct_congested,
         
         -- Calculs basés sur trafic
         CASE 
@@ -93,7 +92,6 @@ trips_with_traffic AS (
         END AS is_stuck_in_traffic,
         
         -- Métadonnées
-        t.loaded_at,
         CURRENT_TIMESTAMP() AS enriched_at
         
     FROM trips_with_borough t
