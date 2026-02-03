@@ -1,92 +1,126 @@
--- jointure selon la date ou la station
+-- Partitionnement et clustering
+{{
+  config(
+    materialized='table',
+    partition_by={
+      "field": "pickup_datetime",
+      "data_type": "timestamp",
+      "granularity": "day"
+    },
+    cluster_by=["service_type", "pickup_location_id"]
+  )
+}}
+
 WITH stg_weather AS (
-    SELECT *
-    FROM {{source("staging_data","stg_weather")}}
-)
-
-stg_yellow_taxi_trips AS (
-    SELECT *
-    FROM {{source("staging_data","stg_yellow_taxi_trips")}}
+    SELECT * FROM {{ ref('stg_weather') }}
 ),
 
--- Jointure de stg_yellow_taxi_trips et  stg_weather
-
-stg_high_volume_vehicule_trips AS (
-    SELECT *
-    FROM {{source("staging_data","stg_high_volume_vehicule_trips")}}
-),
-
-stg_for_hire_vehicule_trips AS (
-    SELECT *
-    FROM {{source("staging_data","stg_for_hire_vehicule_trips")}}
-),
-
-
-yellow_taxi_trips_and_weather AS (
+-- Yellow enrichi
+yellow_enriched AS (
     SELECT 
-        pickup_datetime, 
-        dropoff_datetime, 
-        pickup_location_id, 
-        dropoff_location_id, 
-        passenger_count, 
-        trip_distance_miles, 
-        fare_amount, 
-        extra_charges, 
-        mta_tax, tip_amount,
-        tolls_amount,
-        improvement_surcharge,
-        total_amount,
-        congestion_surcharge, 
-        airport_fee, 
-        store_and_fwd_flag, 
-        service_type, 
-        loaded_at,
-        CASE 
-            WHEN rate_code_id = 1 THEN 'Standard rate'
-            WHEN rate_code_id = 2 THEN 'JFK'
-            WHEN rate_code_id = 3 THEN 'Newark'
-            WHEN rate_code_id = 4 THEN 'Nassau or Westchester'
-            WHEN rate_code_id = 5 THEN 'Negotiated fare'
-            WHEN rate_code_id = 6 THEN 'Group ride '
-            ELSE NULL
-        END AS rate_code_str,
-        CASE 
-            WHEN payment_type_id = 1 THEN 'Credit card'
-            WHEN payment_type_id = 2 THEN 'Cash'     
-            WHEN payment_type_id = 3 THEN 'No charge'
-            WHEN payment_type_id = 4 THEN 'Dispute'
-            WHEN payment_type_id = 5 THEN 'Unknown'
-            WHEN payment_type_id = 6 THEN 'Voided trip' 
-            ELSE NULL
-        END AS payment_type_str,
-        CASE WHEN w.weather_snow_mm>0 THEN TRUE ELSE FALSE END AS is_snowy,
-        CASE WHEN w.weather_precip_mm>0 THEN TRUE ELSE FALSE END AS is_rainy,
---        CASE WHEN w.weather_snow_mm>0 THEN TRUE ELSE FALSE END AS is_heure_pointe,
+        'Yellow Taxi' AS service_type,
+        y.pickup_datetime,
+        y.dropoff_datetime,
+        y.pickup_location_id,
+        y.dropoff_location_id,
+        y.loaded_at,
         
-
-    FROM stg_yellow_taxi_trips as y
-    LEFT JOIN stg_weather as w
-    ON w.weather_date = DATE(y.pickup_datetime)
-    WHERE y.payment_type_str IS NOT NULL
-    AND y.rate_code_str IS NOT NULL
+        -- Métriques communes
+        TIMESTAMP_DIFF(y.dropoff_datetime, y.pickup_datetime, MINUTE) AS trip_duration_minutes,
+        y.trip_distance_miles,
+        CASE
+            WHEN y.trip_distance_miles < 1 THEN 'Intra-quartier'
+            WHEN y.trip_distance_miles < 3 THEN 'Local'
+            WHEN y.trip_distance_miles < 10 THEN 'Cross-borough'
+            ELSE 'Longue distance'
+        END AS distance_category,
+        
+        -- Flags météo
+        CASE WHEN w.weather_snow_mm > 0 THEN TRUE ELSE FALSE END AS is_snowy,
+        CASE WHEN w.weather_precip_mm > 0 THEN TRUE ELSE FALSE END AS is_rainy,
+        
+        -- Flag rush hour
+        CASE 
+            WHEN EXTRACT(DAYOFWEEK FROM y.pickup_datetime) BETWEEN 2 AND 6
+                 AND (EXTRACT(HOUR FROM y.pickup_datetime) BETWEEN 7 AND 9
+                      OR EXTRACT(HOUR FROM y.pickup_datetime) BETWEEN 17 AND 19)
+            THEN TRUE 
+            ELSE FALSE 
+        END AS is_rush_hour
+        
+    FROM {{ ref('stg_yellow_taxi_trips') }} AS y
+    LEFT JOIN stg_weather AS w
+        ON w.weather_date = DATE(y.pickup_datetime)
 ),
 
-high_volume_vehicule_trips_and_weather AS (
-    SELECT * 
-    FROM stg_high_volume_vehicule_trips as h
-    LEFT JOIN stg_weather as w
-    ON w.weather_date = DATE(h.pickup_datetime)
-),
-
-for_hire_vehicule_trips_and_weather AS (
-    SELECT * 
-    FROM stg_for_hire_vehicule_trips as h
-    LEFT JOIN stg_weather as w
-    ON w.eather_date = DATE(h.pickup_datetime)
-)
-
-all_table as (
+-- HVFHV enrichi
+hvfhv_enriched AS (
     SELECT 
+        h.service_type,  -- Déjà 'HVFHV' dans staging
+        h.pickup_datetime,
+        h.dropoff_datetime,
+        h.pickup_location_id,
+        h.dropoff_location_id,
+        h.loaded_at,
+        
+        TIMESTAMP_DIFF(h.dropoff_datetime, h.pickup_datetime, MINUTE) AS trip_duration_minutes,
+        h.trip_distance_miles,
+        CASE
+            WHEN h.trip_distance_miles < 1 THEN 'Intra-quartier'
+            WHEN h.trip_distance_miles < 3 THEN 'Local'
+            WHEN h.trip_distance_miles < 10 THEN 'Cross-borough'
+            ELSE 'Longue distance'
+        END AS distance_category,
+        
+        CASE WHEN w.weather_snow_mm > 0 THEN TRUE ELSE FALSE END AS is_snowy,
+        CASE WHEN w.weather_precip_mm > 0 THEN TRUE ELSE FALSE END AS is_rainy,
+        
+        CASE 
+            WHEN EXTRACT(DAYOFWEEK FROM h.pickup_datetime) BETWEEN 2 AND 6
+                 AND (EXTRACT(HOUR FROM h.pickup_datetime) BETWEEN 7 AND 9
+                      OR EXTRACT(HOUR FROM h.pickup_datetime) BETWEEN 17 AND 19)
+            THEN TRUE 
+            ELSE FALSE 
+        END AS is_rush_hour
+        
+    FROM {{ ref('stg_high_volume_vehicule_trips') }} AS h
+    LEFT JOIN stg_weather AS w
+        ON w.weather_date = DATE(h.pickup_datetime)
+),
+
+-- FHV enrichi
+fhv_enriched AS (
+    SELECT 
+        f.service_type,  -- 'FHV'
+        f.pickup_datetime,
+        f.dropoff_datetime,
+        f.pickup_location_id,
+        f.dropoff_location_id,
+        f.loaded_at,
+        
+        TIMESTAMP_DIFF(f.dropoff_datetime, f.pickup_datetime, MINUTE) AS trip_duration_minutes,
+        NULL AS trip_distance_miles,  -- FHV n'a pas cette info
+        NULL AS distance_category,
+        
+        CASE WHEN w.weather_snow_mm > 0 THEN TRUE ELSE FALSE END AS is_snowy,
+        CASE WHEN w.weather_precip_mm > 0 THEN TRUE ELSE FALSE END AS is_rainy,
+        
+        CASE 
+            WHEN EXTRACT(DAYOFWEEK FROM f.pickup_datetime) BETWEEN 2 AND 6
+                 AND (EXTRACT(HOUR FROM f.pickup_datetime) BETWEEN 7 AND 9
+                      OR EXTRACT(HOUR FROM f.pickup_datetime) BETWEEN 17 AND 19)
+            THEN TRUE 
+            ELSE FALSE 
+        END AS is_rush_hour
+        
+    FROM {{ ref('stg_for_hire_vehicule_trips') }} AS f
+    LEFT JOIN stg_weather AS w
+        ON w.weather_date = DATE(f.pickup_datetime)
 )
 
-
+-- UNION des 3 sources
+SELECT * FROM yellow_enriched
+UNION ALL
+SELECT * FROM hvfhv_enriched
+UNION ALL
+SELECT * FROM fhv_enriched
