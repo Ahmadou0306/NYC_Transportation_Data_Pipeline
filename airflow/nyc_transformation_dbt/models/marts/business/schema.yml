@@ -2,81 +2,513 @@ version: 2
 
 models:
   - name: dim_dates
+    description: "Dimension calendrier avec une ligne par jour de 2020 à aujourd'hui"
     columns:
-    - name: date
-    - name: year
-    - name: month
-    - name: month_name
-    - name: day
-    - name: day_of_week
-    - name: day_of_week_name
-    - name: is_weekend
-    - name: quarter
+      - name: date
+        description: "Date (clé primaire)"
+        tests:
+          - unique
+          - not_null
+      - name: year
+        description: "Année (ex: 2024)"
+        tests:
+          - not_null
+      - name: month
+        description: "Numéro du mois (1-12)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 12
+      - name: month_name
+        description: "Nom du mois en anglais (ex: January)"
+        tests:
+          - not_null
+      - name: day
+        description: "Jour du mois (1-31)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 31
+      - name: day_of_week
+        description: "Jour de la semaine (1=Dimanche, 7=Samedi)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 7
+      - name: day_of_week_name
+        description: "Nom du jour en anglais (ex: Monday)"
+        tests:
+          - not_null
+      - name: is_weekend
+        description: "Indicateur weekend (samedi ou dimanche)"
+        tests:
+          - not_null
+      - name: quarter
+        description: "Trimestre (1-4)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 4
+
   - name: dim_hours
+    description: "Dimension horaire avec 24 lignes (0-23h) et catégorisations temporelles"
     columns:
-    - name: hours
-    - name: hour_12
-    - name: am_pm
-    - name: time_slot
-    - name: is_worked_hours
-    - name: is_rush_hour
+      - name: hours
+        description: "Heure (0-23, clé primaire)"
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 23
+      - name: hour_12
+        description: "Format 12h (1-12)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 12
+      - name: am_pm
+        description: "Indicateur AM/PM"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['AM', 'PM']
+      - name: time_slot
+        description: "Plage horaire (Matin, Après-midi, Soir, Nuit)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Matin', 'Après-midi', 'Soir', 'Nuit']
+      - name: is_worked_hours
+        description: "Indicateur heures ouvrables (6h-18h)"
+        tests:
+          - not_null
+      - name: is_rush_hour
+        description: "Indicateur heures de pointe (7h-10h et 16h-19h)"
+        tests:
+          - not_null
+
   - name: dim_zones
+    description: "Dimension géographique avec les 265 zones taxi NYC et leurs caractéristiques"
     columns:
-    - name: zone_id
-    - name: borough
-    - name: zone_name
-    - name: service_zone
-    - name: is_manhattan
-    - name: is_brooklyn
-    - name: is_bronx
-    - name: is_queens
-    - name: is_staten_island
-    - name: zone_category
+      - name: zone_id
+        description: "ID unique de la zone taxi (1-265, clé primaire)"
+        tests:
+          - unique
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 265
+      - name: borough
+        description: "Borough NYC (Manhattan, Brooklyn, Queens, Bronx, Staten Island, EWR)"
+        tests:
+          - not_null
+      - name: zone_name
+        description: "Nom de la zone (ex: Times Square, JFK Airport)"
+        tests:
+          - not_null
+      - name: service_zone
+        description: "Zone de service taxi (Yellow, Boro, EWR)"
+        tests:
+          - not_null
+      - name: is_manhattan
+        description: "Indicateur zone Manhattan"
+        tests:
+          - not_null
+      - name: is_brooklyn
+        description: "Indicateur zone Brooklyn"
+        tests:
+          - not_null
+      - name: is_bronx
+        description: "Indicateur zone Bronx"
+        tests:
+          - not_null
+      - name: is_queens
+        description: "Indicateur zone Queens"
+        tests:
+          - not_null
+      - name: is_staten_island
+        description: "Indicateur zone Staten Island"
+        tests:
+          - not_null
+      - name: zone_category
+        description: "Catégorie de zone (Airport, Zones touristiques, Business Districts, Autre)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Airport', 'Zones touristiques', 'Business Districts', 'Autre']
+
   - name: dim_weather
+    description: "Dimension météo quotidienne avec conditions et températures"
     columns:
-    - name: weather_date
-    - name: weather_temp_min_celcius
-    - name: weather_temp_max_celcius
-    - name: weather_temp_avg_celcius
-    - name: weather_condition
-    - name: weather_precip_mm
-    - name: weather_snow_mm
-    - name: is_extreme_snow
-    - name: is_extreme_rain
-    - name: is_extreme_temperature
+      - name: weather_date
+        description: "Date météo (clé primaire)"
+        tests:
+          - unique
+          - not_null
+      - name: weather_temp_min_celcius
+        description: "Température minimale en Celsius"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: -30
+              max_value: 50
+              where: "weather_temp_min_celcius IS NOT NULL"
+      - name: weather_temp_max_celcius
+        description: "Température maximale en Celsius"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: -30
+              max_value: 50
+              where: "weather_temp_max_celcius IS NOT NULL"
+      - name: weather_temp_avg_celcius
+        description: "Température moyenne calculée (min+max)/2"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: -30
+              max_value: 50
+              where: "weather_temp_avg_celcius IS NOT NULL"
+      - name: weather_condition
+        description: "Condition météo catégorisée"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Clear', 'Light Rain', 'Moderate Rain', 'Heavy Rain', 'Light Snow', 'Heavy Snow']
+      - name: weather_precip_mm
+        description: "Précipitations en mm"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 500
+              where: "weather_precip_mm IS NOT NULL"
+      - name: weather_snow_mm
+        description: "Chute de neige en mm"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 500
+              where: "weather_snow_mm IS NOT NULL"
+      - name: is_extreme_snow
+        description: "Indicateur neige extrême (>10mm)"
+        tests:
+          - not_null
+      - name: is_extreme_rain
+        description: "Indicateur pluie extrême (>50mm)"
+        tests:
+          - not_null
+      - name: is_extreme_temperature
+        description: "Indicateur température extrême (>35°C ou <-10°C)"
+        tests:
+          - not_null
+
   - name: fact_taxi_trips
+    description: "Table de faits principale avec toutes les courses taxi enrichies (Yellow, HVFHV, FHV)"
     columns:
-    - name: trip_id
-    - name: service_type
-    - name: pickup_datetime
-    - name: pickup_year
-    - name: pickup_month
-    - name: pickup_month_name
-    - name: pickup_day
-    - name: pickup_day_of_week
-    - name: pickup_day_of_week_name
-    - name: pickup_is_weekend
-    - name: pickup_quarter
-    - name: pickup_hour
-    - name: pickup_time_slot
-    - name: pickup_is_rush_hour
-    - name: pickup_zone_name
-    - name: pickup_borough
-    - name: pickup_zone_category
-    - name: dropoff_zone_name
-    - name: dropoff_borough
-    - name: weather_condition
-    - name: weather_temp_avg_celcius
-    - name: is_extreme_snow
-    - name: is_extreme_rain
-    - name: trip_duration_minutes
-    - name: trip_distance_miles
-    - name: distance_category
-    - name: traffic_avg_speed_mph
-    - name: traffic_is_congested
-    - name: estimated_duration_minutes
-    - name: duration_diff_minutes
-    - name: is_stuck_in_traffic
-  - name: fact_311_complaints
+      - name: trip_id
+        description: "ID unique de la course (hash MD5)"
+        tests:
+          - unique
+          - not_null
+      - name: service_type
+        description: "Type de service (Yellow Taxi, HVFHV, FHV)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Yellow Taxi', 'HVFHV', 'FHV']
+      - name: pickup_datetime
+        description: "Date et heure de prise en charge"
+        tests:
+          - not_null
+      - name: pickup_year
+        description: "Année de pickup"
+        tests:
+          - not_null
+      - name: pickup_month
+        description: "Mois de pickup (1-12)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 12
+      - name: pickup_month_name
+        description: "Nom du mois de pickup"
+      - name: pickup_day
+        description: "Jour du mois de pickup"
+      - name: pickup_day_of_week
+        description: "Jour de la semaine de pickup (1-7)"
+      - name: pickup_day_of_week_name
+        description: "Nom du jour de pickup"
+      - name: pickup_is_weekend
+        description: "Indicateur pickup en weekend"
+        tests:
+          - not_null
+      - name: pickup_quarter
+        description: "Trimestre de pickup"
+      - name: pickup_hour
+        description: "Heure de pickup (0-23)"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 23
+              where: "pickup_hour IS NOT NULL"
+      - name: pickup_time_slot
+        description: "Plage horaire de pickup"
+      - name: pickup_is_rush_hour
+        description: "Indicateur pickup en heure de pointe"
+      - name: pickup_zone_name
+        description: "Nom de la zone de pickup"
+      - name: pickup_borough
+        description: "Borough de pickup"
+        tests:
+          - not_null
+      - name: pickup_zone_category
+        description: "Catégorie de la zone de pickup"
+      - name: dropoff_zone_name
+        description: "Nom de la zone de dropoff"
+      - name: dropoff_borough
+        description: "Borough de dropoff"
+      - name: weather_condition
+        description: "Condition météo au moment du pickup"
+      - name: weather_temp_avg_celcius
+        description: "Température moyenne au moment du pickup"
+      - name: is_extreme_snow
+        description: "Indicateur neige extrême au pickup"
+      - name: is_extreme_rain
+        description: "Indicateur pluie extrême au pickup"
+      - name: trip_duration_minutes
+        description: "Durée de la course en minutes"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1440
+      - name: trip_distance_miles
+        description: "Distance de la course en miles"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 200
+              where: "trip_distance_miles IS NOT NULL"
+      - name: distance_category
+        description: "Catégorie de distance (Intra-quartier, Local, Cross-borough, Longue distance)"
+        tests:
+          - accepted_values:
+              values: ['Intra-quartier', 'Local', 'Cross-borough', 'Longue distance']
+              where: "distance_category IS NOT NULL"
+      - name: traffic_avg_speed_mph
+        description: "Vitesse moyenne du trafic au pickup (mph)"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "traffic_avg_speed_mph IS NOT NULL"
+      - name: traffic_is_congested
+        description: "Indicateur trafic congestionné au pickup"
+      - name: estimated_duration_minutes
+        description: "Durée estimée basée sur distance et vitesse trafic"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1440
+              where: "estimated_duration_minutes IS NOT NULL"
+      - name: duration_diff_minutes
+        description: "Écart entre durée réelle et estimée (positif = retard)"
+      - name: is_stuck_in_traffic
+        description: "Indicateur course bloquée dans le trafic (durée > 150% estimée)"
+        tests:
+          - not_null
+
+  - name: fact_311_complaints_daily
+    description: "Agrégation quotidienne des plaintes 311 par borough, type et statut"
     columns:
-    - name:
+      - name: request_date
+        description: "Date de la plainte"
+        tests:
+          - not_null
+      - name: request_year
+        description: "Année de la plainte"
+      - name: request_month
+        description: "Mois de la plainte"
+      - name: request_month_name
+        description: "Nom du mois de la plainte"
+      - name: request_day
+        description: "Jour du mois"
+      - name: request_day_of_week
+        description: "Jour de la semaine"
+      - name: request_day_of_week_name
+        description: "Nom du jour"
+      - name: request_is_weekend
+        description: "Indicateur plainte en weekend"
+      - name: request_quarter
+        description: "Trimestre de la plainte"
+      - name: borough
+        description: "Borough NYC de la plainte"
+        tests:
+          - not_null
+      - name: complaint_type
+        description: "Type de plainte (ex: Illegal Parking, Noise)"
+        tests:
+          - not_null
+      - name: status
+        description: "Statut de la plainte (Open, Closed, Pending)"
+        tests:
+          - not_null
+      - name: total_complaints
+        description: "Nombre total de plaintes"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: closed_complaints
+        description: "Nombre de plaintes fermées"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              where: "closed_complaints IS NOT NULL"
+      - name: open_complaints
+        description: "Nombre de plaintes ouvertes"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              where: "open_complaints IS NOT NULL"
+      - name: pending_complaints
+        description: "Nombre de plaintes en attente"
+      - name: pct_closed
+        description: "Pourcentage de plaintes fermées"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "pct_closed IS NOT NULL"
+      - name: avg_resolution_days
+        description: "Temps moyen de résolution en jours"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 365
+              where: "avg_resolution_days IS NOT NULL"
+      - name: unique_agencies
+        description: "Nombre d'agences impliquées"
+      - name: unique_zip_codes
+        description: "Nombre de codes postaux distincts"
+      - name: weather_condition
+        description: "Condition météo le jour de la plainte"
+      - name: temp_avg_celsius
+        description: "Température moyenne le jour de la plainte"
+      - name: precip_mm
+        description: "Précipitations le jour de la plainte"
+      - name: snow_mm
+        description: "Chute de neige le jour de la plainte"
+      - name: is_extreme_snow
+        description: "Indicateur neige extrême"
+      - name: is_extreme_rain
+        description: "Indicateur pluie extrême"
+      - name: is_extreme_temperature
+        description: "Indicateur température extrême"
+      - name: is_resolved_within_24h
+        description: "Indicateur résolution en moins de 24h"
+      - name: is_resolved_within_week
+        description: "Indicateur résolution en moins de 7 jours"
+      - name: is_slow_resolution
+        description: "Indicateur résolution lente (>30 jours)"
+
+  - name: fact_311_performance_monthly
+    description: "Performance mensuelle des agences par type de plainte avec rankings et scores"
+    columns:
+      - name: month
+        description: "Mois d'agrégation"
+        tests:
+          - not_null
+      - name: year
+        description: "Année"
+      - name: month_number
+        description: "Numéro du mois (1-12)"
+      - name: month_name
+        description: "Nom du mois"
+      - name: quarter
+        description: "Trimestre"
+      - name: agency
+        description: "Code de l'agence (ex: NYPD, DOT)"
+        tests:
+          - not_null
+      - name: agency_name
+        description: "Nom complet de l'agence"
+      - name: complaint_type
+        description: "Type de plainte"
+        tests:
+          - not_null
+      - name: total_complaints
+        description: "Nombre total de plaintes traitées"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: closed_complaints
+        description: "Nombre de plaintes fermées"
+      - name: open_complaints
+        description: "Nombre de plaintes encore ouvertes"
+      - name: pending_complaints
+        description: "Nombre de plaintes en attente"
+      - name: in_progress_complaints
+        description: "Nombre de plaintes en cours de traitement"
+      - name: pct_closed
+        description: "Pourcentage de fermeture"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "pct_closed IS NOT NULL"
+      - name: avg_resolution_days
+        description: "Temps moyen de résolution en jours"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 365
+              where: "avg_resolution_days IS NOT NULL"
+      - name: median_resolution_days
+        description: "Temps médian de résolution en jours"
+      - name: resolved_within_week
+        description: "Nombre résolu en moins de 7 jours"
+      - name: pct_resolved_within_week
+        description: "Pourcentage résolu en moins de 7 jours"
+      - name: resolved_within_24h
+        description: "Nombre résolu en moins de 24h"
+      - name: pct_resolved_within_24h
+        description: "Pourcentage résolu en moins de 24h"
+      - name: resolved_over_30_days
+        description: "Nombre résolu en plus de 30 jours"
+      - name: open_over_30_days
+        description: "Nombre ouvert depuis plus de 30 jours"
+      - name: boroughs_covered
+        description: "Nombre de boroughs couverts"
+      - name: zip_codes_covered
+        description: "Nombre de codes postaux couverts"
+      - name: speed_rank_by_complaint_type
+        description: "Rang de rapidité par type de plainte (1=le plus rapide)"
+      - name: volume_rank_by_agency
+        description: "Rang par volume traité"
+      - name: performance_score
+        description: "Score de performance composite (0-100)"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              where: "performance_score IS NOT NULL"
+      - name: performance_category
+        description: "Catégorie de performance (Excellent, Bon, Moyen, À améliorer)"
+        tests:
+          - accepted_values:
+              values: ['Excellent', 'Bon', 'Moyen', 'À améliorer']
+              where: "performance_category IS NOT NULL"
+      - name: is_fast_agency
+        description: "Indicateur agence rapide (résolution ≤7 jours)"
+      - name: is_high_closure_rate
+        description: "Indicateur taux de fermeture élevé (≥90%)"
+      - name: period_start
+        description: "Début de la période d'observation"
+      - name: period_end
+        description: "Fin de la période d'observation"
