@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: dim_dates
+    columns:
+    - name: date
+    - name: year
+    - name: month
+    - name: month_name
+    - name: day
+    - name: day_of_week
+    - name: day_of_week_name
+    - name: is_weekend
+    - name: quarter
+  - name: dim_hours
+    columns:
+    - name: hours
+    - name: hour_12
+    - name: am_pm
+    - name: time_slot
+    - name: is_worked_hours
+    - name: is_rush_hour
