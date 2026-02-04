@@ -34,4 +34,49 @@ models:
     - name: zone_category
   - name: dim_weather
     columns:
-    - name: 
+    - name: weather_date
+    - name: weather_temp_min_celcius
+    - name: weather_temp_max_celcius
+    - name: weather_temp_avg_celcius
+    - name: weather_condition
+    - name: weather_precip_mm
+    - name: weather_snow_mm
+    - name: is_extreme_snow
+    - name: is_extreme_rain
+    - name: is_extreme_temperature
+  - name: fact_taxi_trips
+    columns:
+    - name: trip_id
+    - name: service_type
+    - name: pickup_datetime
+    - name: pickup_year
+    - name: pickup_month
+    - name: pickup_month_name
+    - name: pickup_day
+    - name: pickup_day_of_week
+    - name: pickup_day_of_week_name
+    - name: pickup_is_weekend
+    - name: pickup_quarter
+    - name: pickup_hour
+    - name: pickup_time_slot
+    - name: pickup_is_rush_hour
+    - name: pickup_zone_name
+    - name: pickup_borough
+    - name: pickup_zone_category
+    - name: dropoff_zone_name
+    - name: dropoff_borough
+    - name: weather_condition
+    - name: weather_temp_avg_celcius
+    - name: is_extreme_snow
+    - name: is_extreme_rain
+    - name: trip_duration_minutes
+    - name: trip_distance_miles
+    - name: distance_category
+    - name: traffic_avg_speed_mph
+    - name: traffic_is_congested
+    - name: estimated_duration_minutes
+    - name: duration_diff_minutes
+    - name: is_stuck_in_traffic
+  - name: fact_311_complaints
+    columns:
+    - name:

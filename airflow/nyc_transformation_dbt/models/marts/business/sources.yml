@@ -5,3 +5,6 @@ sources:
     tables:
       - name: int_weather_impact_daily
       - name: int_trips_enriched
+      - name: int_trips_with_traffic 
+      - name: int_311_by_zone_daily
+      - name: int_311_resolution_performance
