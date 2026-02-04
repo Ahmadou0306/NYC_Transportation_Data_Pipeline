@@ -20,3 +20,16 @@ models:
     - name: time_slot
     - name: is_worked_hours
     - name: is_rush_hour
+  - name: dim_zones
+    columns:
+    - name: zone_id
+    - name: borough
+    - name: zone_name
+    - name: service_zone
+    - name: is_manhattan
+    - name: is_brooklyn
+    - name: is_bronx
+    - name: is_queens
+    - name: is_staten_island
+    - name: zone_category
+  - name: dim_weather
