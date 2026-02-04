@@ -3,4 +3,5 @@ sources:
     database: training-gcp-484513
     schema: marts
     tables:
-      - name: int_311_by_zone_daily
+      - name: int_weather_impact_daily
+      - name: int_trips_enriched

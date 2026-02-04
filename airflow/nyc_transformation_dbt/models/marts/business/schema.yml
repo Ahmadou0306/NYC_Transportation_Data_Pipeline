@@ -33,3 +33,5 @@ models:
     - name: is_staten_island
     - name: zone_category
   - name: dim_weather
+    columns:
+    - name: 
