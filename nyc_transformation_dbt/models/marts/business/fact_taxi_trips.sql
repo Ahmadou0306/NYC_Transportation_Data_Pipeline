@@ -39,7 +39,7 @@ WITH trips AS (
         d.quarter AS pickup_quarter,
 
         -- Dimension heure
-        h.hour AS pickup_hour,
+        h.hours AS pickup_hour,
         h.time_slot AS pickup_time_slot,
         h.is_rush_hour AS pickup_is_rush_hour,
 
@@ -74,7 +74,7 @@ WITH trips AS (
         ON DATE(t.pickup_datetime) = d.date
 
     LEFT JOIN {{ ref('dim_hours') }} AS h
-        ON EXTRACT(HOUR FROM t.pickup_datetime) = h.hour
+        ON EXTRACT(HOUR FROM t.pickup_datetime) = h.hours
 
     LEFT JOIN {{ ref('dim_zones') }} AS pickup_z
         ON t.pickup_location_id = pickup_z.zone_id

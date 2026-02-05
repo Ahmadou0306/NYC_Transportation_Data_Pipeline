@@ -22,18 +22,19 @@ dates_table AS (
 
 colone_calcule AS (
     SELECT 
-        date,
-        EXTRACT(YEAR FROM date) as year,
-        EXTRACT(MONTH FROM date) as month,
-        FORMAT_DATE('%B', date) AS month_name,
-        EXTRACT(DAY FROM date) as day,
-        EXTRACT(DAYOFWEEK FROM date) AS day_of_week,
-        FORMAT_DATE('%A', date) AS day_of_week_name,
+        dt.date,
+        EXTRACT(YEAR FROM dt.date) AS year,
+        EXTRACT(MONTH FROM dt.date) AS month,
+        FORMAT_DATE('%B', dt.date) AS month_name,
+        EXTRACT(DAY FROM dt.date) AS day,
+        EXTRACT(DAYOFWEEK FROM dt.date) AS day_of_week,
+        FORMAT_DATE('%A', dt.date) AS day_of_week_name,
         CASE
-            WHEN EXTRACT(DAYOFWEEK FROM date) in (1,7) THEN TRUE
+            WHEN EXTRACT(DAYOFWEEK FROM dt.date) IN (1,7) THEN TRUE
             ELSE FALSE
         END AS is_weekend,
-        EXTRACT(QUARTER FROM date) as quarter
+        EXTRACT(QUARTER FROM dt.date) AS quarter
+    FROM dates_table AS dt  -- Add table alias and FROM clause
 )
 
 SELECT *

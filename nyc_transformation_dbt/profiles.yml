@@ -15,7 +15,7 @@ nyc_transformation_dbt:
       type: bigquery
       method: service-account
       project: training-gcp-484513
-      dataset: nyc_data_prod
+      dataset: nyc_data
       threads: 4
       timeout_seconds: 300
       location: EU
