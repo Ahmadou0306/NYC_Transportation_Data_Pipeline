@@ -5,7 +5,7 @@ nyc_transformation_dbt:
       type: bigquery
       method: service-account
       project: training-gcp-484513
-      dataset: staging  # tables stg_* iront ici
+      dataset: nyc_data  # tables stg_* iront ici
       threads: 4
       timeout_seconds: 300
       location: EU
@@ -15,8 +15,8 @@ nyc_transformation_dbt:
       type: bigquery
       method: service-account
       project: training-gcp-484513
-      dataset: staging
+      dataset: nyc_data_prod
       threads: 4
       timeout_seconds: 300
-      location: US
+      location: EU
       keyfile: /opt/airflow/config/gcp/airflow-gcp-key.json

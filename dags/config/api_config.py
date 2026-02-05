@@ -8,7 +8,7 @@ GCP_CREDENTIALS_PATH = os.getenv(
     '/opt/airflow/config/gcp/airflow-gcp-key.json'
 )
 DATASETS_GBQ = {
-    "staging":"staging" # nom du dataset est staging 
+    "staging":"nyc_data" # nom du dataset est raw 
 }
 
 CONNECTION_BQ_AIRFLOW = os.getenv('CONNECTION_BQ_AIRFLOW','gcp-bigquery')

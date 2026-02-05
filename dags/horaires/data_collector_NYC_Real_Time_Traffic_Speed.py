@@ -187,7 +187,7 @@ def upload_to_bq(ti, **kwargs):
     try:
         # Charger directement dans BigQuery depuis la mémoire
         client = bigquery.Client()
-        table_id = f"{GCP_PROJECT_ID}.staging.raw_traffic_speed"
+        table_id = f"{GCP_PROJECT_ID}.nyc_data.raw_traffic_speed"
         
         job_config = bigquery.LoadJobConfig(
             source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,

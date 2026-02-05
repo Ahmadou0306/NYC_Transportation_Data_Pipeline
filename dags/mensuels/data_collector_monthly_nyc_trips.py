@@ -96,7 +96,7 @@ def extract_and_load(api_label, **kwargs):
     # ========== LOAD BIGQUERY ==========
     try:
         bq_client = bigquery.Client()
-        table_id = f"{GCP_PROJECT_ID}.staging.raw_{api_label}"
+        table_id = f"{GCP_PROJECT_ID}.nyc_data.raw_{api_label}"
         
         # Charger depuis GCS (plus efficace que depuis la mémoire pour Parquet)
         uri = f"gs://{GCS_BUCKET_NAME}/{gcs_path}"
@@ -105,6 +105,10 @@ def extract_and_load(api_label, **kwargs):
             source_format=bigquery.SourceFormat.PARQUET,
             write_disposition='WRITE_APPEND',
             create_disposition='CREATE_IF_NEEDED',
+            schema_update_options=[
+                bigquery.SchemaUpdateOption.ALLOW_FIELD_RELAXATION
+            ],
+            autodetect=True
         )
         
         logger.info(f"Chargement BigQuery depuis: {uri}")
@@ -148,7 +152,7 @@ with DAG(
         f"Sources: {API_CONFIG['high_volume_vehicule_trips']['base_url']}"
     ),
     start_date=datetime(2020, 1, 1),
-    end_date=datetime(2025, 1, 31),
+    end_date=datetime(2025, 12, 31),
     schedule='0 22 1 * *',  # 1er du mois à 22h
     catchup=True,
     max_active_runs=1,

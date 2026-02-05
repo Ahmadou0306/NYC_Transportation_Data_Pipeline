@@ -3,7 +3,7 @@ version: 2
 sources:
   - name: raw_data
     database: training-gcp-484513
-    schema: staging
+    schema: nyc_data
     tables:
       - name: raw_weather
         description: "Données météo brutes NOAA"

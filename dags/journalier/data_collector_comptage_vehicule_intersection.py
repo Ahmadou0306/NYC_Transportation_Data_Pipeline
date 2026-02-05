@@ -212,7 +212,7 @@ def upload_to_bq(ti, **kwargs):
     
     try:
         client = bigquery.Client()
-        table_id = f"{GCP_PROJECT_ID}.staging.raw_traffic_volume"
+        table_id = f"{GCP_PROJECT_ID}.nyc_data.raw_traffic_volume"
         
         # Pour CSV : Convertir en string
         output = StringIO()

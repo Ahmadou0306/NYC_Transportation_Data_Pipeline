@@ -4,6 +4,7 @@ venv
 .env
 */.env
 config/*
+!config/gcp/.gitkeep
 logs/*
 __pycache__
 */__pycache__
