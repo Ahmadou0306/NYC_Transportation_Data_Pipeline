@@ -18,9 +18,10 @@ Pipeline ELT (Extract-Load-Transform) end-to-end de grade production pour l'anal
 8. [Securite et gouvernance GCP](#securite-et-gouvernance-gcp)
 9. [Conteneurisation avec Docker](#conteneurisation-avec-docker)
 10. [Qualite des donnees](#qualite-des-donnees)
-11. [Perspectives et evolutions](#perspectives-et-evolutions)
-12. [Installation et configuration](#installation-et-configuration)
-13. [Documentation et references](#documentation-et-references)
+11. [Visualisation avec Power BI](#visualisation-avec-power-bi)
+12. [Perspectives et evolutions](#perspectives-et-evolutions)
+13. [Installation et configuration](#installation-et-configuration)
+14. [Documentation et references](#documentation-et-references)
 
 ---
 
@@ -610,13 +611,45 @@ Plus de 80 tests de qualite des donnees sont executes quotidiennement :
 
 ---
 
-## Perspectives et evolutions
+## Visualisation avec Power BI
 
-- **Visualisation Power BI** : Connexion native BigQuery vers Power BI pour dashboards interactifs
-  - Dashboard Vue d'ensemble : KPIs transport temps reel
-  - Dashboard Meteo et Mobilite : Correlations visuelles
-  - Dashboard 311 : Heatmap plaintes par zone
-  - Dashboard Taxi Analytics : Patterns temporels et geographiques
+### Connexion BigQuery vers Power BI
+
+Les tables analytiques de la couche Marts sont consommees via Power BI Desktop, connecte nativement a BigQuery. La connexion utilise le connecteur Google BigQuery integre a Power BI, authentifie via le compte de service GCP du projet.
+
+#### Configuration de la source de donnees
+
+La connexion s'effectue en selectionnant BigQuery comme source de donnees, puis en renseignant le projet GCP et le dataset contenant les tables Marts :
+
+![Configuration BigQuery - Etape 1](images/pbi_configuration_bq_1.png)
+
+#### Authentification et selection des tables
+
+L'authentification s'appuie sur les credentials Google. Les tables de dimensions et de faits de la couche Marts sont selectionnees pour l'import :
+
+![Configuration BigQuery - Etape 2](images/pbi_configuration_bq_2.png)
+
+#### Chargement des donnees
+
+Les tables sont chargees dans le modele Power BI avec leur schema BigQuery preserve (types, noms de colonnes, partitionnement) :
+
+![Configuration BigQuery - Etape 3](images/pbi_configuration_bq_3.png)
+
+### Modelisation en schema etoile
+
+Une fois les tables importees, les relations entre dimensions et faits sont etablies dans Power BI pour former un schema en etoile (Star Schema). Ce schema relie chaque table de faits a ses dimensions correspondantes via des cles etrangeres :
+
+- **fact_taxi_trips** est reliee a dim_dates (par date), dim_hours (par heure), dim_zones (par pickup/dropoff location) et dim_weather (par date meteorologique)
+- **fact_311_complaints_daily** est reliee a dim_dates et dim_weather
+- **fact_311_performance_monthly** est reliee a dim_dates
+
+Cette modelisation permet des analyses croisees entre toutes les dimensions du projet : temporelle, geographique et meteorologique.
+
+![Schema relationnel Power BI](images/pbi_schema.png)
+
+---
+
+## Perspectives et evolutions
 
 - **Monitoring avance** :
   - Alertes sur echecs de DAG via Slack/Email

@@ -44,11 +44,13 @@ WITH trips AS (
         h.is_rush_hour AS pickup_is_rush_hour,
 
         -- Dimension zone
+        pickup_z.zone_id AS pickup_zone_id,
         pickup_z.zone_name AS pickup_zone_name,
         t.pickup_borough,
         pickup_z.zone_category AS pickup_zone_category,
         
         -- Dimension dropoff zone
+        dropoff_z.zone_id AS dropoff_zone_id,
         dropoff_z.zone_name AS dropoff_zone_name,
         dropoff_z.borough AS dropoff_borough,
 
